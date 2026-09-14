@@ -111,6 +111,15 @@ for _c in CHANNELS:
 # 의미를 갖습니다. ledger.py 가 이 값에 맞춰 주문 수를 보정합니다.
 TARGET_ANNUAL_KRW = 4_300_000_000
 
+# 고객을 사람 단위로 식별할 수 있는 채널.
+#
+# 대량주문·사입·어매니티·면세·수출은 받는 쪽이 법인이거나 중간 유통이라
+# '이 사람이 이 제품라인을 경험했다'를 셀 수 없습니다. 상품별·고객 리포트의
+# 경험률·재구매 지표는 여기 있는 채널만 봅니다. 매출 집계(판매처별·Chart)는
+# 전 채널을 그대로 씁니다 — 두 리포트의 분모가 다른 이유입니다.
+IDENTIFIED_CHANNELS = [c['key'] for c in CHANNELS
+                       if c['group'] == '온라인' or c['sub'] == '매장']
+
 # 일일 대시보드(daily/)가 쓰는 판매처 이름 — 월간 원장이 이를 포함하는지
 # 검증하는 데 씁니다. 두 데모의 표기를 어긋나지 않게 두기 위한 것이고,
 # 합계까지 맞추지는 않습니다(원장이 서로 다릅니다).
@@ -160,7 +169,7 @@ def _skus():
         'SOP': [('90g', 29000), ('3입 세트', 76000)],
         'BWS': [('450ml', 43000), ('리필 900ml', 58000)],
         'BLT': [('300ml', 41000), ('리필 700ml', 55000)],
-        'SHP': [('450ml', 39000)],
+        'SHP': [('450ml', 39000), ('리필 800ml', 52000)],
         'CDT': [('450ml', 39000)],
     }
     out = []
@@ -206,7 +215,16 @@ def selftest():
     missing = [n for n in DAILY_CHANNEL_NAMES if n not in CHANNEL_KEYS]
     assert not missing, '일일 대시보드 판매처가 월간 마스터에 없음: %s' % missing
     assert len(WINDOW_13) == 13
+    idw = sum(c['weight'] for c in CHANNELS if c['key'] in IDENTIFIED_CHANNELS)
+    assert 0.6 < idw < 0.8, '식별 가능 채널 비중이 %.2f' % idw
     assert len(SKUS) == len(set(s['sku'] for s in SKUS)), 'SKU 중복'
+    # 리필 라인으로 선언해 놓고 리필 SKU 가 없으면 '리필구매연결비율' 이
+    # 조용히 0% 로 나옵니다. 지표가 0 인 건지 제품이 없는 건지 화면에서
+    # 구분이 안 되므로 여기서 막습니다.
+    for l in LINES:
+        has = any(s['is_refill'] for s in SKUS if s['line'] == l['code'])
+        assert has == l['refill'], \
+            '%s: refill=%s 인데 리필 SKU 는 %s' % (l['code'], l['refill'], has)
     return dict(months=len(ALL_MONTHS), channels=len(CHANNELS),
                 lines=len(LINES), skus=len(SKUS))
 

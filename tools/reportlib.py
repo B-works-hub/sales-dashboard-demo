@@ -85,21 +85,42 @@ def row(name, kind, values_by_month, note=None, months=None):
     )
 
 
-def ratio_row(name, num_by_month, den_by_month, note=None, months=None):
+# 비율을 낼 최소 분모. 이보다 표본이 작으면 값을 내지 않습니다.
+#
+# 라인 구매 고객이 3명인 달에 2명이 재구매하면 66.7% 로 찍힙니다. 옆 달은
+# 0% 고, 그 사이 증감은 ▲66.7%p 가 됩니다. 신호가 아니라 잡음인데 표에서는
+# 가장 큰 숫자로 보입니다. 작은 제품라인에서 이런 칸이 줄줄이 나옵니다.
+MIN_DEN = 20
+
+
+def ratio_row(name, num_by_month, den_by_month, note=None, months=None,
+              min_den=None):
     """비중 줄 — 분자/분모를 받아 직접 나눕니다.
 
     비중의 월평균을 '월별 비중의 평균'으로 내면 분모가 작은 달이 과대
     반영됩니다. 합계끼리 나눈 값을 씁니다.
+
+    min_den 미만인 달은 None 으로 비웁니다. 0% 로 적으면 '실적이 0' 과
+    '표본이 모자람' 이 같은 칸으로 보입니다.
     """
     months = months or M.WINDOW_13
-    by = {}
+    floor = MIN_DEN if min_den is None else min_den
+    by, thin = {}, 0
     for ym in months + [M.shift_month(months[-1], -12)]:
         n, d = num_by_month.get(ym), den_by_month.get(ym)
-        by[ym] = (n / float(d)) if (n is not None and d) else None
+        if n is None or not d:
+            by[ym] = None
+        elif d < floor:
+            by[ym] = None
+            if ym in months:
+                thin += 1
+        else:
+            by[ym] = n / float(d)
     r = row(name, KIND_PCT, by, note=note, months=months)
     num_tot = sum(v for v in (num_by_month.get(m) for m in months) if v is not None)
     den_tot = sum(v for v in (den_by_month.get(m) for m in months) if v is not None)
-    r['avg'] = (num_tot / float(den_tot)) if den_tot else None
+    r['avg'] = (num_tot / float(den_tot)) if den_tot >= floor else None
+    r['thin'] = thin          # 표본 부족으로 비운 달 수
     return r
 
 
@@ -138,9 +159,16 @@ def selftest():
     assert growth(0.12, 0.10, KIND_PCT) - 0.02 < 1e-9   # %p
     assert growth(5, 0, KIND_INT) is None               # 분모 0 → 정의 안 됨
     assert delta(None, 3, KIND_INT) is None
+    mm = [(2026, 6), (2026, 7)]
     r = ratio_row('t', {(2026, 7): 1, (2026, 6): 9},
-                  {(2026, 7): 10, (2026, 6): 10}, months=[(2026, 6), (2026, 7)])
-    assert abs(r['avg'] - 0.5) < 1e-9, r['avg']         # 10/20, 비중 평균이 아님
+                  {(2026, 7): 100, (2026, 6): 100}, months=mm)
+    assert abs(r['avg'] - 0.05) < 1e-9, r['avg']        # 10/200, 비중 평균이 아님
+    # 표본이 모자란 달은 0% 가 아니라 빈칸이어야 합니다
+    t = ratio_row('t', {(2026, 7): 2, (2026, 6): 40},
+                  {(2026, 7): 3, (2026, 6): 100}, months=mm)
+    assert t['values'][-1] is None, t['values']
+    assert t['thin'] == 1, t['thin']
+    assert t['mom_growth'] is None                      # 빈칸에서 증감을 내지 않음
     return 'ok'
 
 

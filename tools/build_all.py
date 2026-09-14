@@ -13,7 +13,8 @@ import reportlib as R
 
 BUILDERS = [
     ('customer', 'build_customer'),
-    # 앞으로: product / channel / chart / flagship
+    ('product',  'build_product'),
+    # 앞으로: channel / chart / flagship
 ]
 
 

@@ -69,6 +69,15 @@ var Report = (function () {
     var table = el('table');
     var last = months.length - 1;
 
+    /* 섹션 전체가 비중 지표면 증감수 열이 통째로 비어 나옵니다(비중의
+       증감은 %p 하나로 충분해 delta 를 내지 않습니다). 빈 열 두 개가
+       19열 중 2열을 먹으므로 아예 접습니다. */
+    var allPct = section.rows.length > 0;
+    for (var q = 0; q < section.rows.length; q++) {
+      if (section.rows[q].kind !== 'pct') { allPct = false; break; }
+    }
+    var cmpSpan = allPct ? 1 : 2;
+
     /* 머리 2줄 — 연도 / 월. 같은 해는 한 번만 적습니다. */
     var thead = el('thead');
     var rY = el('tr', 'years');
@@ -80,8 +89,8 @@ var Report = (function () {
       rY.appendChild(th);
     }
     rY.appendChild(el('th', 'avg', ''));
-    var g1 = el('th', 'grp cmp', '전월대비'); g1.colSpan = 2; rY.appendChild(g1);
-    var g2 = el('th', 'grp cmp', '전년동월대비'); g2.colSpan = 2; rY.appendChild(g2);
+    var g1 = el('th', 'grp cmp', '전월대비'); g1.colSpan = cmpSpan; rY.appendChild(g1);
+    var g2 = el('th', 'grp cmp', '전년동월대비'); g2.colSpan = cmpSpan; rY.appendChild(g2);
     thead.appendChild(rY);
 
     var rM = el('tr');
@@ -90,10 +99,10 @@ var Report = (function () {
       rM.appendChild(el('th', i === last ? 'cur' : '', months[i].m + '월'));
     }
     rM.appendChild(el('th', 'avg', '월평균'));
-    rM.appendChild(el('th', 'cmp', '증감수'));
-    rM.appendChild(el('th', 'cmp', '성장률'));
-    rM.appendChild(el('th', 'cmp', '증감수'));
-    rM.appendChild(el('th', 'cmp', '성장률'));
+    if (!allPct) rM.appendChild(el('th', 'cmp', '증감수'));
+    rM.appendChild(el('th', 'cmp', allPct ? '증감(%p)' : '성장률'));
+    if (!allPct) rM.appendChild(el('th', 'cmp', '증감수'));
+    rM.appendChild(el('th', 'cmp', allPct ? '증감(%p)' : '성장률'));
     thead.appendChild(rM);
     table.appendChild(thead);
 
@@ -115,9 +124,13 @@ var Report = (function () {
         tr.appendChild(td);
       }
       tr.appendChild(el('td', 'num avg', fmt(row.avg, row.kind)));
-      tr.appendChild(el('td', 'num cmp ' + dirClass(row.mom_delta),  fmtDelta(row.mom_delta, row.kind)));
+      if (!allPct) {
+        tr.appendChild(el('td', 'num cmp ' + dirClass(row.mom_delta), fmtDelta(row.mom_delta, row.kind)));
+      }
       tr.appendChild(el('td', 'num cmp ' + dirClass(row.mom_growth), fmtGrowth(row.mom_growth, row.kind)));
-      tr.appendChild(el('td', 'num cmp ' + dirClass(row.yoy_delta),  fmtDelta(row.yoy_delta, row.kind)));
+      if (!allPct) {
+        tr.appendChild(el('td', 'num cmp ' + dirClass(row.yoy_delta), fmtDelta(row.yoy_delta, row.kind)));
+      }
       tr.appendChild(el('td', 'num cmp ' + dirClass(row.yoy_growth), fmtGrowth(row.yoy_growth, row.kind)));
       tbody.appendChild(tr);
     }

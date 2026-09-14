@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>상품별 리포트 — 데모</title>
+<link rel="stylesheet" href="../shared/tokens.css">
+<link rel="stylesheet" href="../shared/report.css">
+<script src="../data/product.js"></script>
+<script src="../shared/report.js"></script>
+<style>
+  /* 라인 선택 줄 — 14종이라 탭으로 깔면 두 줄을 먹습니다. */
+  .picker { display: flex; gap: 14px; align-items: flex-end;
+            flex-wrap: wrap; margin: 4px 0 20px; }
+  .picker label { display: block; font-size: 12px; color: var(--ink-muted);
+                  margin-bottom: 4px; }
+  .picker select { font: inherit; font-size: 13.5px; padding: 7px 10px;
+                   background: var(--surface); color: var(--ink);
+                   border: 1px solid var(--hairline); border-radius: 8px;
+                   min-width: 190px; }
+  .picker select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .thin-warn { display: none; align-items: center; gap: 6px; font-size: 12.5px;
+               color: var(--noteflo-ink); background: var(--noteflo-bg);
+               border: 1px solid var(--noteflo-bd); border-radius: 8px;
+               padding: 6px 10px; }
+  .thin-warn.on { display: flex; }
+</style>
+</head>
+<body>
+
+<div class="notice">
+  데모 화면의 숫자·판매처·상품은 <b>전부 생성된 가상 데이터</b>입니다.
+  실물은 구글 계정 로그인 뒤 시트에서 값을 받아 그립니다 —
+  <a href="https://github.com/B-works-hub/sales-reports-demo#readme">구조 설명</a>
+</div>
+
+<div class="wrap">
+  <div class="crumb"><a href="../">← 매출 리포트</a></div>
+
+  <div class="head">
+    <div>
+      <h1>상품별 리포트</h1>
+      <p class="sub" id="sub"></p>
+    </div>
+    <div class="meta">
+      <b id="meta-base"></b>
+      <span id="meta-window"></span>
+    </div>
+  </div>
+
+  <div class="picker">
+    <div>
+      <label for="line">제품라인</label>
+      <select id="line"></select>
+    </div>
+    <div class="thin-warn" id="thin">
+      <span>⚠</span>
+      <span id="thin-text"></span>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="tabs" id="tabs" role="tablist"></div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2 id="panel-title"></h2>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="hint">지표명에 커서를 올리면 정의가 나옵니다</span>
+        <button class="btn" id="csv" type="button">CSV 다운로드</button>
+      </div>
+    </div>
+    <div class="scroller" id="scroller"></div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var D = PRODUCT_DATA;
+  var R = Report;
+
+  document.getElementById('meta-base').textContent = '기준월 ' + D.base;
+  document.getElementById('meta-window').textContent =
+    D.months[0].key + ' ~ ' + D.months[D.months.length - 1].key;
+  document.getElementById('sub').textContent =
+    D.channel + ' · 제품라인 ' + Object.keys(D.lines).length + '종 · 직전 13개월';
+
+  /* ── 라인 선택 ────────────────────────────────────────────────
+     '전체 비교' 를 맨 위에 둡니다. 라인 하나씩만 볼 수 있으면
+     어느 라인이 크고 어느 라인이 줄고 있는지를 알 수가 없습니다. */
+  var sel = document.getElementById('line');
+  var gAll = document.createElement('optgroup');
+  gAll.label = '전체';
+  var oAll = document.createElement('option');
+  oAll.value = '*'; oAll.textContent = '라인 비교';
+  gAll.appendChild(oAll);
+  sel.appendChild(gAll);
+
+  for (var c = 0; c < D.categories.length; c++) {
+    var cat = D.categories[c];
+    var g = document.createElement('optgroup');
+    g.label = cat.name;
+    for (var i = 0; i < cat.lines.length; i++) {
+      var code = cat.lines[i];
+      var o = document.createElement('option');
+      o.value = code;
+      o.textContent = code + ' · ' + D.lines[code].name;
+      g.appendChild(o);
+    }
+    sel.appendChild(g);
+  }
+
+  var tabs = document.getElementById('tabs');
+  var scroller = document.getElementById('scroller');
+  var title = document.getElementById('panel-title');
+  var kpiBox = document.getElementById('kpis');
+  var notesBox = document.getElementById('notes');
+  var thinBox = document.getElementById('thin');
+  var current = { sections: null, sec: null, code: null };
+
+  function sectionsFor(code) {
+    return code === '*' ? D.overview : D.lines[code].sections;
+  }
+
+  function findRow(sections, name) {
+    for (var s = 0; s < sections.length; s++) {
+      for (var r = 0; r < sections[s].rows.length; r++) {
+        if (sections[s].rows[r].name === name) return sections[s].rows[r];
+      }
+    }
+    return null;
+  }
+
+  var KPI = ['경험률(당월)', '경험고객수(당월)', '재구매율(12개월)', '리필구매연결비율'];
+
+  function renderKpis(code, sections) {
+    kpiBox.innerHTML = '';
+    if (code === '*') return;               /* 비교 화면에는 카드를 두지 않습니다 */
+    for (var k = 0; k < KPI.length; k++) {
+      var row = findRow(sections, KPI[k]);
+      if (!row) continue;                   /* 리필 없는 라인은 칸이 빕니다 */
+      var card = R.el('div', 'kpi');
+      card.appendChild(R.el('div', 'label', row.name));
+      card.appendChild(R.el('div', 'value num',
+                            R.fmt(row.values[row.values.length - 1], row.kind)));
+      var foot = R.el('div', 'foot');
+      foot.appendChild(R.el('span', '', '전월대비 '));
+      foot.appendChild(R.el('span', 'num ' + R.dirClass(row.mom_growth),
+                            R.fmtGrowth(row.mom_growth, row.kind)));
+      card.appendChild(foot);
+      kpiBox.appendChild(card);
+    }
+  }
+
+  function renderNotes(sec) {
+    notesBox.innerHTML = '';
+    for (var i = 0; i < D.notes.length; i++) {
+      notesBox.appendChild(R.el('p', '', '※ ' + D.notes[i]));
+    }
+    var dl = R.el('dl'), any = false;
+    for (var r = 0; r < sec.rows.length; r++) {
+      if (!sec.rows[r].note) continue;
+      dl.appendChild(R.el('dt', '', sec.rows[r].name));
+      dl.appendChild(R.el('dd', '', sec.rows[r].note));
+      any = true;
+    }
+    if (any) notesBox.appendChild(dl);
+  }
+
+  /* 표본이 얇으면 비율 칸이 비어 나옵니다. 왜 비었는지를 화면에 적습니다 —
+     빈칸만 보여주면 '데이터가 깨졌나' 로 읽힙니다. */
+  function renderThin(code, sections) {
+    var blanks = 0, i, s, r;
+    for (s = 0; s < sections.length; s++) {
+      for (r = 0; r < sections[s].rows.length; r++) {
+        var row = sections[s].rows[r];
+        if (row.kind !== 'pct') continue;
+        for (i = 0; i < row.values.length; i++) {
+          if (row.values[i] === null) blanks++;
+        }
+      }
+    }
+    if (code === '*' || !blanks) { thinBox.className = 'thin-warn'; return; }
+    thinBox.className = 'thin-warn on';
+    document.getElementById('thin-text').textContent =
+      '구매 고객이 ' + D.min_den + '명 미만인 달은 비율을 비웠습니다 (' + blanks + '칸)';
+  }
+
+  function showSection(key, push) {
+    var sections = current.sections, sec = null, i;
+    for (i = 0; i < sections.length; i++) {
+      if (sections[i].key === key) sec = sections[i];
+    }
+    if (!sec) sec = sections[0];
+    current.sec = sec;
+
+    title.textContent = sec.label;
+    scroller.innerHTML = '';
+    scroller.appendChild(R.renderMatrix(sec, D.months));
+
+    var btns = tabs.querySelectorAll('button');
+    for (i = 0; i < btns.length; i++) {
+      btns[i].setAttribute('aria-selected', btns[i].dataset.key === sec.key ? 'true' : 'false');
+    }
+    if (push) R.writeState('sec', sec.key);
+    renderNotes(sec);
+  }
+
+  function showLine(code, push) {
+    if (!D.lines[code] && code !== '*') code = '*';
+    current.code = code;
+    current.sections = sectionsFor(code);
+    sel.value = code;
+
+    tabs.innerHTML = '';
+    for (var t = 0; t < current.sections.length; t++) {
+      (function (sec) {
+        var b = R.el('button', '', sec.label);
+        b.type = 'button';
+        b.dataset.key = sec.key;
+        b.setAttribute('role', 'tab');
+        b.onclick = function () { showSection(sec.key, true); };
+        tabs.appendChild(b);
+      })(current.sections[t]);
+    }
+
+    renderKpis(code, current.sections);
+    renderThin(code, current.sections);
+    if (push) R.writeState('line', code);
+    showSection(R.readState('sec', current.sections[0].key), false);
+  }
+
+  sel.onchange = function () { showLine(sel.value, true); };
+
+  document.getElementById('csv').onclick = function () {
+    var who = current.code === '*' ? '라인비교' : current.code;
+    R.download('상품별리포트_' + who + '_' + current.sec.key + '_' + D.base + '.csv',
+               R.toCsv(current.sec, D.months));
+  };
+
+  showLine(R.readState('line', '*'), false);
+})();
+</script>
+
+</body>
+</html>
