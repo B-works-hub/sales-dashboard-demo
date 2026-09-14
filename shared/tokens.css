@@ -1,0 +1,88 @@
+/* 디자인 토큰 — daily/index.html 의 토큰 체계를 그대로 옮긴 것입니다.
+ * 월간 리포트 5종이 공유합니다. daily 는 자기 인라인 스타일을 그대로 쓰므로
+ * 이 파일을 고쳐도 일일 대시보드는 바뀌지 않습니다. */
+:root {
+  color-scheme: light;
+  --plane:        #ffffff;
+  --surface:      #ffffff;
+  --surface-2:    #f2f5f7;
+  --ink:          #15191d;
+  --ink-2:        #4c545c;
+  --ink-muted:    #8b939c;
+  --hairline:     #e6e9eb;
+  --border:       rgba(15,23,32,0.10);
+  --accent:       #1d6fa5;
+  --accent-soft:  #e8f1fa;
+  --good:         #0ca30c;
+  --serious:      #c1543a;
+  --up:           #c1543a;   /* 국내 관행 : 상승 적색 */
+  --down:         #1d6fa5;   /*            하락 청색 */
+  --neg:          #c1543a;   /* 마이너스 금액 */
+  --memo:         #e07a1f;   /* 메모 표시 주황 */
+  --noteflo-bg:   #fdeeea;   /* 한 줄 코멘트 : 연한 붉은 배경 */
+  --noteflo-bd:   #f3c6ba;
+  --noteflo-ink:  #c0561a;   /* 진한 주황 */
+  --today-hl:     #f2f542;   /* TODAY 형광 노랑 */
+  /* 하이라이트 농도. 다크에서는 밴드가 안쪽 막대 색을 덮어 판매처 구분이
+     흐려지므로 더 묽게 깝니다. */
+  --today-hl-op:  .5;
+  --today-bd:     #e8690b;   /* 당일 행 테두리 : 메모 주황보다 한 톤 진하게 */
+  /* 열별 색 스케일의 가장 진한 단계. 농도는 알파로만 조절해
+     글자가 흰색으로 바뀔 만큼 어두워지지 않습니다. */
+  --scale-rgb:    122, 179, 230;
+  /* 판매처 색 — 설정 탭의 판매처 순서와 1:1 고정입니다 (첫 줄이 c1).
+     앞 몇 자리는 지정 브랜드 색이고, 인접 구간이 색각 이상에서 구분되도록
+     명도 계단으로 배치했습니다. 순서를 바꾸면 이 검증이 깨집니다. */
+  --c1:#1B6B3A;   /* 진한 초록 */
+  --c2:#4E9A1F;   /* 연두 */
+  --c3:#F7C500;   /* 노랑 */
+  --c4:#B5457B;
+  --c5:#1A1A1A;   /* 검정 */
+  --c6:#9A5F2B;
+  --c7:#2A78D6;
+  --c8:#C0392B;
+  --c9:#5C5FBF;
+  --c10:#DE5F2A;
+  --c11:#008B7A;
+  --c12:#7B3FA0;
+  --c13:#0288A7;
+  --c14:#6D7C1F;
+  --c15:#D14A8F;
+  --c-other:#8b939c;   /* 설정에 없는 판매처 */
+  --shadow: 0 1px 2px rgba(15,23,32,.05), 0 8px 24px -12px rgba(15,23,32,.16);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --plane:#14171a; --surface:#1c2024; --surface-2:#23282d;
+    --ink:#f2f4f6; --ink-2:#c1c8ce; --ink-muted:#8b939c;
+    --hairline:#2c3237; --border:rgba(255,255,255,0.10);
+    --accent:#3e8cc4; --accent-soft:#1c2a3d;
+    --good:#0ca30c; --serious:#c96a50;
+    --up:#c96a50; --down:#3e8cc4; --neg:#e8877a; --memo:#f0a04b;
+    --noteflo-bg:#3b211b; --noteflo-bd:#5d3529; --noteflo-ink:#f0a86b;
+    --today-hl:#d8dc22; --today-hl-op:.26; --scale-rgb:122, 179, 230; --today-bd:#ff9d4d;
+    /* c5 의 검정은 어두운 배경에서 묻히므로 흰색으로 반전됩니다 */
+    --c1:#0C7B46;  --c2:#5CA51E;  --c3:#E8B900;  --c4:#D46A9C;  --c5:#D8D8D8;
+    --c6:#B7823F;  --c7:#3987E5;  --c8:#E06A5A;  --c9:#8286E0;  --c10:#D66E45;
+    --c11:#26A69A; --c12:#8B5BB5; --c13:#3AA8C4; --c14:#8A9930; --c15:#DA649F;
+    --c-other:#8b939c;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --plane:#14171a; --surface:#1c2024; --surface-2:#23282d;
+  --ink:#f2f4f6; --ink-2:#c1c8ce; --ink-muted:#8b939c;
+  --hairline:#2c3237; --border:rgba(255,255,255,0.10);
+  --accent:#3e8cc4; --accent-soft:#1c2a3d;
+  --good:#0ca30c; --serious:#c96a50;
+  --up:#c96a50; --down:#3e8cc4; --neg:#e8877a; --memo:#f0a04b;
+  --noteflo-bg:#3b211b; --noteflo-bd:#5d3529; --noteflo-ink:#f0a86b;
+  --today-hl:#d8dc22; --today-hl-op:.26; --scale-rgb:122, 179, 230; --today-bd:#ff9d4d;
+  --c1:#0C7B46;  --c2:#5CA51E;  --c3:#E8B900;  --c4:#D46A9C;  --c5:#D8D8D8;
+  --c6:#B7823F;  --c7:#3987E5;  --c8:#E06A5A;  --c9:#8286E0;  --c10:#D66E45;
+  --c11:#26A69A; --c12:#8B5BB5; --c13:#3AA8C4; --c14:#8A9930; --c15:#DA649F;
+  --c-other:#8b939c;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+}
