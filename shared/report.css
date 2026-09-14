@@ -117,6 +117,27 @@ tr.is-total td, tr.is-total .metric { font-weight: 700; background: var(--surfac
 .notes dt { color: var(--ink-2); font-weight: 700; }
 .notes dd { margin: 0; }
 
+/* 계층 · 비활성 채널 */
+tr.is-inactive .metric { color: var(--ink-muted); text-decoration: line-through; }
+tr.is-inactive td { color: var(--ink-muted); }
+
+/* 장부 토글 — 두 장부를 한 화면에서 섞지 않는다는 걸 눈에 보이게 합니다. */
+.seg { display: inline-flex; border: 1px solid var(--hairline);
+       border-radius: 9px; overflow: hidden; background: var(--surface); }
+.seg button { appearance: none; background: none; border: 0; font: inherit;
+              font-size: 13.5px; padding: 8px 16px; cursor: pointer;
+              color: var(--ink-2); }
+.seg button + button { border-left: 1px solid var(--hairline); }
+.seg button:hover { background: var(--surface-2); color: var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; font-weight: 700; }
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.book { display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+        margin: 4px 0 18px; }
+.book-badge { font-size: 12.5px; padding: 5px 11px; border-radius: 999px;
+              background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.book-note { font-size: 12.5px; color: var(--ink-muted); max-width: 60ch; }
+
 /* 버튼 */
 .btn { appearance: none; background: var(--surface); color: var(--ink-2);
        border: 1px solid var(--hairline); border-radius: 8px;

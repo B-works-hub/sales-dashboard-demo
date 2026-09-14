@@ -70,11 +70,14 @@ WINDOW_13    = month_range(shift_month(BASE_MONTH, -(MONTHS_BACK - 1)), BASE_MON
 #                적고 건당이 크므로, 주문 빈도는 weight ÷ bulk 로 역산합니다.
 #                이걸 섞으면 대량주문이 매출의 절반을 먹습니다.
 #   bulk       : 건당 평균 수량 배수 (1 = 일반 소비자 주문)
-#   sellin     : sell-in ÷ sell-out 비율 (직영은 1.0 — 사입이 없음)
+#   sellin     : 공급가율 — sell-in ÷ sell-out 의 연 누적 기준값.
+#                직영도 1.0 이 아닙니다. 소비자가에서 결제수수료·부가세가
+#                빠진 금액이 우리 장부에 잡힙니다. 위탁은 판매수수료가,
+#                직매입은 도매 마진이 더 빠집니다.
 CHANNELS = [
     # 온라인 · 직영몰
-    dict(key='자사몰',        group='온라인',   sub='직영몰', model='직영',   opened='2021.04', closed=None,      status='ACTIVE',   weight=0.150, bulk=1,  sellin=1.00),
-    dict(key='검색포털 I',    group='온라인',   sub='직영몰', model='직영',   opened='2021.04', closed=None,      status='ACTIVE',   weight=0.045, bulk=1,  sellin=1.00),
+    dict(key='자사몰',        group='온라인',   sub='직영몰', model='직영',   opened='2021.04', closed=None,      status='ACTIVE',   weight=0.150, bulk=1,  sellin=0.90),
+    dict(key='검색포털 I',    group='온라인',   sub='직영몰', model='직영',   opened='2021.04', closed=None,      status='ACTIVE',   weight=0.045, bulk=1,  sellin=0.91),
     # 온라인 · 입점몰
     dict(key='오픈마켓 A',    group='온라인',   sub='입점몰', model='위탁',   opened='2021.04', closed=None,      status='ACTIVE',   weight=0.190, bulk=1,  sellin=0.85),
     dict(key='오픈마켓 B',    group='온라인',   sub='입점몰', model='직매입', opened='2023.02', closed=None,      status='ACTIVE',   weight=0.080, bulk=1,  sellin=0.85),
@@ -84,9 +87,9 @@ CHANNELS = [
     dict(key='라이브커머스 F', group='온라인',  sub='입점몰', model='위탁',   opened='2022.09', closed=None,      status='ACTIVE',   weight=0.030, bulk=2,  sellin=0.85),
     dict(key='구도몰 O',      group='온라인',   sub='입점몰', model='위탁',   opened='2023.06', closed='2025.05', status='INACTIVE', weight=0.000, bulk=1,  sellin=0.85),
     # 오프라인 · 매장
-    dict(key='플래그십',      group='오프라인', sub='매장',   model='직영',   opened='2024.03', closed=None,      status='ACTIVE',   weight=0.070, bulk=1,  sellin=1.00),
-    dict(key='직영매장 G',    group='오프라인', sub='매장',   model='직영',   opened='2022.05', closed=None,      status='ACTIVE',   weight=0.025, bulk=1,  sellin=1.00),
-    dict(key='팝업스토어 L',  group='오프라인', sub='매장',   model='직영',   opened='2023.08', closed=None,      status='ACTIVE',   weight=0.020, bulk=1,  sellin=1.00),
+    dict(key='플래그십',      group='오프라인', sub='매장',   model='직영',   opened='2024.03', closed=None,      status='ACTIVE',   weight=0.070, bulk=1,  sellin=0.92),
+    dict(key='직영매장 G',    group='오프라인', sub='매장',   model='직영',   opened='2022.05', closed=None,      status='ACTIVE',   weight=0.025, bulk=1,  sellin=0.92),
+    dict(key='팝업스토어 L',  group='오프라인', sub='매장',   model='직영',   opened='2023.08', closed=None,      status='ACTIVE',   weight=0.020, bulk=1,  sellin=0.92),
     # 오프라인 · 유통
     dict(key='백화점 D',      group='오프라인', sub='유통',   model='위탁',   opened='2022.11', closed=None,      status='ACTIVE',   weight=0.040, bulk=1,  sellin=0.80),
     dict(key='복지몰 H',      group='오프라인', sub='유통',   model='위탁',   opened='2022.02', closed=None,      status='ACTIVE',   weight=0.030, bulk=3,  sellin=0.80),

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>판매처별 리포트 — 데모</title>
+<link rel="stylesheet" href="../shared/tokens.css">
+<link rel="stylesheet" href="../shared/report.css">
+<script src="../data/channel.js"></script>
+<script src="../shared/report.js"></script>
+</head>
+<body>
+
+<div class="notice">
+  데모 화면의 숫자·판매처·상품은 <b>전부 생성된 가상 데이터</b>입니다.
+  실물은 구글 계정 로그인 뒤 시트에서 값을 받아 그립니다 —
+  <a href="https://github.com/B-works-hub/sales-reports-demo#readme">구조 설명</a>
+</div>
+
+<div class="wrap">
+  <div class="crumb"><a href="../">← 매출 리포트</a></div>
+
+  <div class="head">
+    <div>
+      <h1>판매처별 리포트</h1>
+      <p class="sub">전 채널 · 계층별 월 실적 · 직전 13개월</p>
+    </div>
+    <div class="meta">
+      <b id="meta-base"></b>
+      <span id="meta-window"></span>
+    </div>
+  </div>
+
+  <div class="book">
+    <div class="seg" id="seg" role="group" aria-label="장부 선택"></div>
+    <span class="book-badge" id="badge"></span>
+    <span class="book-note" id="book-note"></span>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="tabs" id="tabs" role="tablist"></div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2 id="panel-title"></h2>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="hint">채널명에 커서를 올리면 거래조건이 나옵니다</span>
+        <button class="btn" id="csv" type="button">CSV 다운로드</button>
+      </div>
+    </div>
+    <div class="scroller" id="scroller"></div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var D = CHANNEL_DATA;
+  var R = Report;
+
+  document.getElementById('meta-base').textContent = '기준월 ' + D.base;
+  document.getElementById('meta-window').textContent =
+    D.months[0].key + ' ~ ' + D.months[D.months.length - 1].key;
+
+  var seg = document.getElementById('seg');
+  var badge = document.getElementById('badge');
+  var bookNote = document.getElementById('book-note');
+  var tabs = document.getElementById('tabs');
+  var scroller = document.getElementById('scroller');
+  var title = document.getElementById('panel-title');
+  var kpiBox = document.getElementById('kpis');
+  var notesBox = document.getElementById('notes');
+
+  var cur = { book: null, sections: null, sec: null };
+
+  /* 장부 대조는 두 장부를 나란히 놓고 보는 표라 어느 한쪽에 속하지
+     않습니다. 토글과 무관하게 항상 마지막 탭으로 붙입니다. */
+  function sectionsFor(bookKey) {
+    return D.ledgers[bookKey].sections.concat([D.reconcile]);
+  }
+
+  function findRow(sections, secKey, name) {
+    for (var s = 0; s < sections.length; s++) {
+      if (sections[s].key !== secKey) continue;
+      for (var r = 0; r < sections[s].rows.length; r++) {
+        if (sections[s].rows[r].name === name) return sections[s].rows[r];
+      }
+    }
+    return null;
+  }
+
+  function renderKpis(bookKey, sections) {
+    kpiBox.innerHTML = '';
+    var specs = [
+      ['amount', '전체',       '전체 매출'],
+      ['amount', '온라인',     '온라인'],
+      ['amount', '오프라인',   '오프라인'],
+      ['amount', '글로벌',     '글로벌']
+    ];
+    for (var k = 0; k < specs.length; k++) {
+      var row = findRow(sections, specs[k][0], specs[k][1]);
+      if (!row) continue;
+      var card = R.el('div', 'kpi');
+      card.appendChild(R.el('div', 'label', specs[k][2]));
+      card.appendChild(R.el('div', 'value num',
+                            R.fmt(row.values[row.values.length - 1], row.kind)));
+      var foot = R.el('div', 'foot');
+      foot.appendChild(R.el('span', '', '전월대비 '));
+      foot.appendChild(R.el('span', 'num ' + R.dirClass(row.mom_growth),
+                            R.fmtGrowth(row.mom_growth, row.kind)));
+      card.appendChild(foot);
+      kpiBox.appendChild(card);
+    }
+  }
+
+  function renderNotes(sec) {
+    notesBox.innerHTML = '';
+    for (var i = 0; i < D.notes.length; i++) {
+      notesBox.appendChild(R.el('p', '', '※ ' + D.notes[i]));
+    }
+  }
+
+  function showSection(key, push) {
+    var sections = cur.sections, sec = null, i;
+    for (i = 0; i < sections.length; i++) {
+      if (sections[i].key === key) sec = sections[i];
+    }
+    if (!sec) sec = sections[0];
+    cur.sec = sec;
+
+    title.textContent = sec.label;
+    scroller.innerHTML = '';
+    scroller.appendChild(R.renderMatrix(sec, D.months));
+
+    var btns = tabs.querySelectorAll('button');
+    for (i = 0; i < btns.length; i++) {
+      btns[i].setAttribute('aria-selected', btns[i].dataset.key === sec.key ? 'true' : 'false');
+    }
+    if (push) R.writeState('sec', sec.key);
+    renderNotes(sec);
+  }
+
+  function showBook(bookKey, push) {
+    if (!D.ledgers[bookKey]) bookKey = D.ledger_order[0];
+    var led = D.ledgers[bookKey];
+    cur.book = bookKey;
+    cur.sections = sectionsFor(bookKey);
+
+    badge.textContent = led.badge;
+    bookNote.textContent = led.note;
+
+    var sbtns = seg.querySelectorAll('button');
+    for (var i = 0; i < sbtns.length; i++) {
+      sbtns[i].setAttribute('aria-pressed', sbtns[i].dataset.key === bookKey ? 'true' : 'false');
+    }
+
+    tabs.innerHTML = '';
+    for (var t = 0; t < cur.sections.length; t++) {
+      (function (sec) {
+        var b = R.el('button', '', sec.label);
+        b.type = 'button';
+        b.dataset.key = sec.key;
+        b.setAttribute('role', 'tab');
+        b.onclick = function () { showSection(sec.key, true); };
+        tabs.appendChild(b);
+      })(cur.sections[t]);
+    }
+
+    renderKpis(bookKey, cur.sections);
+    if (push) R.writeState('book', bookKey);
+    showSection(R.readState('sec', cur.sections[0].key), false);
+  }
+
+  for (var b = 0; b < D.ledger_order.length; b++) {
+    (function (key) {
+      var btn = R.el('button', '', D.ledgers[key].label);
+      btn.type = 'button';
+      btn.dataset.key = key;
+      btn.onclick = function () { showBook(key, true); };
+      seg.appendChild(btn);
+    })(D.ledger_order[b]);
+  }
+
+  document.getElementById('csv').onclick = function () {
+    R.download('판매처별리포트_' + cur.book + '_' + cur.sec.key + '_' + D.base + '.csv',
+               R.toCsv(cur.sec, D.months));
+  };
+
+  showBook(R.readState('book', D.ledger_order[0]), false);
+})();
+</script>
+
+</body>
+</html>

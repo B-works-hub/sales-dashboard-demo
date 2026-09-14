@@ -112,10 +112,16 @@ var Report = (function () {
       var isRatio = row.name.charAt(0) === '(' || /비중|비율|률$/.test(row.name);
       var tr = el('tr', isRatio ? 'is-ratio' : (/^총/.test(row.name) ? 'is-total' : ''));
 
+      if (row.total) tr.className = 'is-total';
+      if (row.inactive) tr.className += ' is-inactive';
+
       var th = el('th', 'metric');
       th.scope = 'row';
       th.textContent = row.name;
       if (row.note) th.title = row.note;
+      /* 계층 들여쓰기. 비중 행의 들여쓰기와 겹치면 안 되므로 인라인으로
+         덮어씁니다 — 판매처별 리포트는 그룹 > 하위 > 채널 3단입니다. */
+      if (row.indent) th.style.paddingLeft = (10 + row.indent * 15) + 'px';
       tr.appendChild(th);
 
       for (i = 0; i < row.values.length; i++) {

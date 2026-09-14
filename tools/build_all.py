@@ -14,7 +14,8 @@ import reportlib as R
 BUILDERS = [
     ('customer', 'build_customer'),
     ('product',  'build_product'),
-    # 앞으로: channel / chart / flagship
+    ('channel',  'build_channel'),
+    # 앞으로: chart / flagship
 ]
 
 
@@ -32,6 +33,8 @@ def main():
     for key, mod in BUILDERS:
         m = __import__(mod)
         payload = m.build(rows, customers)
+        if hasattr(m, 'check'):
+            m.check(payload)      # 조용히 틀린 값은 빌드를 세웁니다
         out = os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
                                            'data', key + '.js'))
         varname = key.upper() + '_DATA'
