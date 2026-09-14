@@ -29,6 +29,9 @@
     --noteflo-bd:   #f3c6ba;
     --noteflo-ink:  #c0561a;   /* 진한 주황 */
     --today-hl:     #f2f542;   /* TODAY 형광 노랑 */
+    /* 하이라이트 농도. 다크에서는 밴드가 안쪽 막대 색을 덮어 판매처 구분이
+       흐려지므로 더 묽게 깝니다. */
+    --today-hl-op:  .5;
     --today-bd:     #e8690b;   /* 당일 행 테두리 : 메모 주황보다 한 톤 진하게 */
     /* 열별 색 스케일의 가장 진한 단계. 농도는 알파로만 조절해
        글자가 흰색으로 바뀔 만큼 어두워지지 않습니다. */
@@ -64,7 +67,7 @@
       --good:#0ca30c; --serious:#c96a50;
       --up:#c96a50; --down:#3e8cc4; --neg:#e8877a; --memo:#f0a04b;
       --noteflo-bg:#3b211b; --noteflo-bd:#5d3529; --noteflo-ink:#f0a86b;
-      --today-hl:#d8dc22; --scale-rgb:122, 179, 230; --today-bd:#ff9d4d;
+      --today-hl:#d8dc22; --today-hl-op:.26; --scale-rgb:122, 179, 230; --today-bd:#ff9d4d;
       /* c5 의 검정은 어두운 배경에서 묻히므로 흰색으로 반전됩니다 */
       --c1:#0C7B46;  --c2:#5CA51E;  --c3:#E8B900;  --c4:#D46A9C;  --c5:#D8D8D8;
       --c6:#B7823F;  --c7:#3987E5;  --c8:#E06A5A;  --c9:#8286E0;  --c10:#D66E45;
@@ -82,7 +85,7 @@
     --good:#0ca30c; --serious:#c96a50;
     --up:#c96a50; --down:#3e8cc4; --neg:#e8877a; --memo:#f0a04b;
     --noteflo-bg:#3b211b; --noteflo-bd:#5d3529; --noteflo-ink:#f0a86b;
-    --today-hl:#d8dc22; --scale-rgb:122, 179, 230; --today-bd:#ff9d4d;
+    --today-hl:#d8dc22; --today-hl-op:.26; --scale-rgb:122, 179, 230; --today-bd:#ff9d4d;
     --c1:#0C7B46;  --c2:#5CA51E;  --c3:#E8B900;  --c4:#D46A9C;  --c5:#D8D8D8;
     --c6:#B7823F;  --c7:#3987E5;  --c8:#E06A5A;  --c9:#8286E0;  --c10:#D66E45;
     --c11:#26A69A; --c12:#8B5BB5; --c13:#3AA8C4; --c14:#8A9930; --c15:#DA649F;
@@ -3930,10 +3933,10 @@
     var hlTop = y(top);
     o += '<rect x="' + hlX.toFixed(1) + '" y="' + hlTop.toFixed(1) +
          '" width="' + hlW.toFixed(1) + '" height="' + ((H - mb) - hlTop).toFixed(1) +
-         '" fill="var(--today-hl)" opacity=".5" stroke="none" pointer-events="none"/>';
+         '" fill="var(--today-hl)" style="opacity:var(--today-hl-op)" stroke="none" pointer-events="none"/>';
     o += '<text x="' + cx(A.n - 1).toFixed(1) + '" y="' + (hlTop - 8).toFixed(1) +
          '" text-anchor="middle" textLength="' + hlW.toFixed(1) + '" lengthAdjust="spacingAndGlyphs"' +
-         ' style="fill:#000;font-weight:800;font-size:11px" pointer-events="none">TODAY</text>';
+         ' style="fill:var(--ink);font-weight:800;font-size:11px" pointer-events="none">TODAY</text>';
 
     for (t = 0; t <= 4; t++) {
       yy = y(top * t / 4);
