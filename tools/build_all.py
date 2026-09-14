@@ -15,7 +15,8 @@ BUILDERS = [
     ('customer', 'build_customer'),
     ('product',  'build_product'),
     ('channel',  'build_channel'),
-    # 앞으로: chart / flagship
+    ('chart',    'build_chart'),
+    # 앞으로: flagship
 ]
 
 

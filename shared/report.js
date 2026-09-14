@@ -144,6 +144,100 @@ var Report = (function () {
     return table;
   }
 
+  /* ── 교차 히트맵 ──────────────────────────────────────────────────
+     행 = 제품라인 계층, 열 = 채널.
+
+     농담은 **행 안에서만** 계산합니다. 표 전체를 한 척도로 칠하면 큰 라인이
+     전부 진하고 작은 라인이 전부 연해져, 이미 왼쪽 숫자로 아는 사실을
+     색으로 한 번 더 말할 뿐입니다. 행별로 나누면 '이 라인이 어느 채널에서
+     팔리는가' 라는, 숫자만 봐서는 안 보이는 것이 나옵니다.
+
+     색은 한 가지 색상의 밝기 한 단계뿐이고(무지개 아님), 농도는 알파로만
+     조절해 글자가 흰색으로 바뀔 만큼 어두워지지 않습니다. */
+
+  function renderCross(grid, rowDefs, cols, kind, colMeta) {
+    var table = el('table', 'heat');
+    var i, j;
+
+    var thead = el('thead');
+    var rg = el('tr', 'years');
+    rg.appendChild(el('th', 'metric', ''));
+    var prevGroup = null, span = 0, pending = null;
+    for (i = 0; i < cols.length; i++) {
+      var g = colMeta && colMeta[i] ? colMeta[i].group : '';
+      if (g === prevGroup) { span++; }
+      else {
+        if (pending) { pending.colSpan = span; rg.appendChild(pending); }
+        pending = el('th', 'grp', g); span = 1; prevGroup = g;
+      }
+    }
+    if (pending) { pending.colSpan = span; rg.appendChild(pending); }
+    rg.appendChild(el('th', 'avg', ''));
+    thead.appendChild(rg);
+
+    var rh = el('tr');
+    rh.appendChild(el('th', 'metric', '제품라인'));
+    for (i = 0; i < cols.length; i++) {
+      var th = el('th', colMeta && colMeta[i] && colMeta[i].inactive ? 'nil' : '', cols[i]);
+      rh.appendChild(th);
+    }
+    rh.appendChild(el('th', 'avg', '합계'));
+    thead.appendChild(rh);
+    table.appendChild(thead);
+
+    var tbody = el('tbody');
+    for (i = 0; i < rowDefs.length; i++) {
+      var def = rowDefs[i], vals = grid[i];
+      var tr = el('tr', def.total ? 'is-total' : '');
+      var th = el('th', 'metric');
+      th.scope = 'row';
+      th.textContent = def.label;
+      if (def.indent) th.style.paddingLeft = (10 + def.indent * 15) + 'px';
+      tr.appendChild(th);
+
+      var rowMax = 0, rowSum = 0;
+      for (j = 0; j < vals.length; j++) {
+        rowSum += vals[j];
+        if (vals[j] > rowMax) rowMax = vals[j];
+      }
+      for (j = 0; j < vals.length; j++) {
+        var td = el('td', 'num cell', fmt(vals[j], kind));
+        if (!vals[j]) {
+          td.className += ' nil';
+        } else {
+          /* 0~1 정규화 값만 심고 알파 범위는 CSS 가 테마별로 매핑합니다.
+             여기서 알파를 계산해 굳혀 두면 다크에서 칸이 너무 밝아져
+             흰 글자 대비가 3.87:1 까지 떨어지고, 테마를 바꿔도 다시
+             칠해지지 않습니다. */
+          td.className += ' on';
+          td.style.setProperty('--t', (vals[j] / rowMax).toFixed(4));
+          td.title = def.label + ' · ' + cols[j] + '\n' + fmt(vals[j], kind) +
+                     ' · 행 내 ' + (100 * vals[j] / rowSum).toFixed(1) + '%';
+        }
+        tr.appendChild(td);
+      }
+      tr.appendChild(el('td', 'num avg', fmt(rowSum, kind)));
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    return table;
+  }
+
+  /* 스케일 범례 — 농담이 무엇을 뜻하는지 적지 않으면 색이 장식이 됩니다. */
+  function heatLegend() {
+    var wrap = el('div', 'heat-legend');
+    wrap.appendChild(el('span', '', '행 내 비중'));
+    var bar = el('span', 'heat-bar');
+    for (var i = 0; i < 6; i++) {
+      var sw = el('span', 'heat-sw');
+      sw.style.setProperty('--t', (i / 5).toFixed(2));
+      bar.appendChild(sw);
+    }
+    wrap.appendChild(bar);
+    wrap.appendChild(el('span', '', '낮음 → 높음'));
+    return wrap;
+  }
+
   /* ── CSV ──────────────────────────────────────────────────────── */
 
   function csvCell(s) {
@@ -166,6 +260,16 @@ var Report = (function () {
       lines.push(line.map(csvCell).join(','));
     }
     return '﻿' + lines.join('\n');       // BOM — 엑셀에서 한글이 깨집니다
+  }
+
+  function crossCsv(grid, rowDefs, cols) {
+    var lines = [['제품라인'].concat(cols, ['합계']).map(csvCell).join(',')];
+    for (var i = 0; i < rowDefs.length; i++) {
+      var sum = 0;
+      for (var j = 0; j < grid[i].length; j++) sum += grid[i][j];
+      lines.push([rowDefs[i].label].concat(grid[i], [sum]).map(csvCell).join(','));
+    }
+    return '\ufeff' + lines.join('\n');
   }
 
   function download(name, text) {
@@ -200,7 +304,8 @@ var Report = (function () {
 
   return {
     fmt: fmt, fmtDelta: fmtDelta, fmtGrowth: fmtGrowth, dirClass: dirClass,
-    renderMatrix: renderMatrix, toCsv: toCsv, download: download,
+    renderMatrix: renderMatrix, renderCross: renderCross,
+    heatLegend: heatLegend, crossCsv: crossCsv, toCsv: toCsv, download: download,
     readState: readState, writeState: writeState, el: el, comma: comma
   };
 })();

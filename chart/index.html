@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chart 리포트 — 데모</title>
+<link rel="stylesheet" href="../shared/tokens.css">
+<link rel="stylesheet" href="../shared/report.css">
+<script src="../data/chart.js"></script>
+<script src="../shared/report.js"></script>
+</head>
+<body>
+
+<div class="notice">
+  데모 화면의 숫자·판매처·상품은 <b>전부 생성된 가상 데이터</b>입니다.
+  실물은 구글 계정 로그인 뒤 시트에서 값을 받아 그립니다 —
+  <a href="https://github.com/B-works-hub/sales-reports-demo#readme">구조 설명</a>
+</div>
+
+<div class="wrap">
+  <div class="crumb"><a href="../">← 매출 리포트</a></div>
+
+  <div class="head">
+    <div>
+      <h1>Chart 리포트</h1>
+      <p class="sub">제품라인 × 채널 · 수량 / 금액 · 당월 / 누적</p>
+    </div>
+    <div class="meta">
+      <b id="meta-base"></b>
+      <span id="meta-window"></span>
+    </div>
+  </div>
+
+  <div class="axes">
+    <div>
+      <span class="axis-label">측정</span>
+      <div class="seg" id="seg-measure" role="group" aria-label="측정 선택"></div>
+    </div>
+    <div>
+      <span class="axis-label">기간</span>
+      <div class="seg" id="seg-period" role="group" aria-label="기간 선택"></div>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="tabs" id="tabs" role="tablist"></div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2 id="panel-title"></h2>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <span id="legend-slot"></span>
+        <button class="btn" id="csv" type="button">CSV 다운로드</button>
+      </div>
+    </div>
+    <div class="scroller" id="scroller"></div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var D = CHART_DATA;
+  var R = Report;
+
+  document.getElementById('meta-base').textContent = '기준월 ' + D.base;
+  document.getElementById('meta-window').textContent =
+    D.months[0].key + ' ~ ' + D.months[D.months.length - 1].key;
+
+  var SECTIONS = [
+    { key: 'cross',   label: '제품라인 × 채널' },
+    { key: 'line',    label: '제품라인별 추이' },
+    { key: 'cat',     label: '카테고리별 추이' },
+    { key: 'channel', label: '채널별 추이' }
+  ];
+
+  var scroller = document.getElementById('scroller');
+  var title = document.getElementById('panel-title');
+  var legendSlot = document.getElementById('legend-slot');
+  var kpiBox = document.getElementById('kpis');
+  var tabs = document.getElementById('tabs');
+
+  var cur = { measure: null, period: null, section: null };
+
+  function measureSpec() {
+    for (var i = 0; i < D.measures.length; i++) {
+      if (D.measures[i].key === cur.measure) return D.measures[i];
+    }
+    return D.measures[0];
+  }
+
+  function comboKey() { return cur.measure + '|' + cur.period; }
+
+  var colNames = [], colMeta = [];
+  for (var c = 0; c < D.channels.length; c++) {
+    colNames.push(D.channels[c].key);
+    colMeta.push(D.channels[c]);
+  }
+
+  /* KPI — 카테고리 4개의 당월(또는 누적) 값. 교차표 19×19 를 읽기 전에
+     '어느 카테고리가 큰가' 가 먼저 보여야 합니다. */
+  function renderKpis() {
+    kpiBox.innerHTML = '';
+    var rows = D.trends[comboKey()].cat;
+    var kind = measureSpec().kind;
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var card = R.el('div', 'kpi');
+      card.appendChild(R.el('div', 'label', row.name));
+      card.appendChild(R.el('div', 'value num',
+                            R.fmt(row.values[row.values.length - 1], kind)));
+      var foot = R.el('div', 'foot');
+      foot.appendChild(R.el('span', '', '전월대비 '));
+      foot.appendChild(R.el('span', 'num ' + R.dirClass(row.mom_growth),
+                            R.fmtGrowth(row.mom_growth, kind)));
+      card.appendChild(foot);
+      kpiBox.appendChild(card);
+    }
+  }
+
+  function renderNotes() {
+    var box = document.getElementById('notes');
+    box.innerHTML = '';
+    for (var i = 0; i < D.notes.length; i++) {
+      box.appendChild(R.el('p', '', '※ ' + D.notes[i].replace(/\*\*/g, '')));
+    }
+  }
+
+  function draw() {
+    var spec = measureSpec();
+    var sec = cur.section;
+    var label = '';
+    for (var i = 0; i < SECTIONS.length; i++) {
+      if (SECTIONS[i].key === sec) label = SECTIONS[i].label;
+    }
+    var per = '';
+    for (i = 0; i < D.periods.length; i++) {
+      if (D.periods[i].key === cur.period) per = D.periods[i].label;
+    }
+    title.textContent = label + ' · ' + spec.label + ' · ' + per;
+
+    scroller.innerHTML = '';
+    legendSlot.innerHTML = '';
+    if (sec === 'cross') {
+      scroller.appendChild(R.renderCross(
+        D.cross[comboKey()], D.row_defs, colNames, spec.kind, colMeta));
+      legendSlot.appendChild(R.heatLegend());
+    } else {
+      scroller.appendChild(R.renderMatrix(
+        { rows: D.trends[comboKey()][sec] }, D.months));
+      legendSlot.appendChild(R.el('span', 'hint', '행 이름에 커서를 올리면 구분이 나옵니다'));
+    }
+
+    var btns = tabs.querySelectorAll('button');
+    for (i = 0; i < btns.length; i++) {
+      btns[i].setAttribute('aria-selected', btns[i].dataset.key === sec ? 'true' : 'false');
+    }
+    renderKpis();
+    renderNotes();
+  }
+
+  function seg(host, items, stateKey, apply) {
+    for (var i = 0; i < items.length; i++) {
+      (function (it) {
+        var b = R.el('button', '', it.label);
+        b.type = 'button';
+        b.dataset.key = it.key;
+        b.onclick = function () {
+          apply(it.key);
+          R.writeState(stateKey, it.key);
+          sync();
+          draw();
+        };
+        host.appendChild(b);
+      })(items[i]);
+    }
+  }
+
+  function sync() {
+    var pairs = [['seg-measure', cur.measure], ['seg-period', cur.period]];
+    for (var p = 0; p < pairs.length; p++) {
+      var btns = document.getElementById(pairs[p][0]).querySelectorAll('button');
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].setAttribute('aria-pressed',
+          btns[i].dataset.key === pairs[p][1] ? 'true' : 'false');
+      }
+    }
+  }
+
+  seg(document.getElementById('seg-measure'), D.measures, 'm',
+      function (k) { cur.measure = k; });
+  seg(document.getElementById('seg-period'), D.periods, 'p',
+      function (k) { cur.period = k; });
+
+  for (var t = 0; t < SECTIONS.length; t++) {
+    (function (s) {
+      var b = R.el('button', '', s.label);
+      b.type = 'button';
+      b.dataset.key = s.key;
+      b.setAttribute('role', 'tab');
+      b.onclick = function () {
+        cur.section = s.key;
+        R.writeState('sec', s.key);
+        draw();
+      };
+      tabs.appendChild(b);
+    })(SECTIONS[t]);
+  }
+
+  document.getElementById('csv').onclick = function () {
+    var name = 'Chart_' + cur.section + '_' + cur.measure + '_' + cur.period +
+               '_' + D.base + '.csv';
+    if (cur.section === 'cross') {
+      R.download(name, R.crossCsv(D.cross[comboKey()], D.row_defs, colNames));
+    } else {
+      R.download(name, R.toCsv({ rows: D.trends[comboKey()][cur.section] }, D.months));
+    }
+  };
+
+  cur.measure = R.readState('m', D.measures[0].key);
+  cur.period  = R.readState('p', D.periods[0].key);
+  cur.section = R.readState('sec', SECTIONS[0].key);
+  if (!D.trends[comboKey()]) { cur.measure = D.measures[0].key; cur.period = D.periods[0].key; }
+  sync();
+  draw();
+})();
+</script>
+
+</body>
+</html>
