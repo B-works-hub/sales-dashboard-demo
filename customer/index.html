@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>고객 리포트 — 데모</title>
+<link rel="stylesheet" href="../shared/tokens.css">
+<link rel="stylesheet" href="../shared/report.css">
+<script src="../data/customer.js"></script>
+<script src="../shared/report.js"></script>
+</head>
+<body>
+
+<div class="notice">
+  데모 화면의 숫자·판매처·상품은 <b>전부 생성된 가상 데이터</b>입니다.
+  실물은 구글 계정 로그인 뒤 시트에서 값을 받아 그립니다 —
+  <a href="https://github.com/B-works-hub/sales-reports-demo#readme">구조 설명</a>
+</div>
+
+<div class="wrap">
+  <div class="crumb"><a href="../">← 매출 리포트</a></div>
+
+  <div class="head">
+    <div>
+      <h1>고객 리포트</h1>
+      <p class="sub">자사몰 · 구매자 키 기준 · 직전 13개월</p>
+    </div>
+    <div class="meta">
+      <b id="meta-base"></b>
+      <span id="meta-window"></span>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="tabs" id="tabs" role="tablist"></div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2 id="panel-title"></h2>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="hint">지표명에 커서를 올리면 정의가 나옵니다</span>
+        <button class="btn" id="csv" type="button">CSV 다운로드</button>
+      </div>
+    </div>
+    <div class="scroller" id="scroller"></div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var D = CUSTOMER_DATA;
+  var R = Report;
+
+  document.getElementById('meta-base').textContent = '기준월 ' + D.base;
+  document.getElementById('meta-window').textContent =
+    D.months[0].key + ' ~ ' + D.months[D.months.length - 1].key;
+
+  /* ── KPI 카드 ─────────────────────────────────────────────────
+     당월 값과 전월대비를 나란히 답니다. 표 19열을 다 읽기 전에
+     '이번 달 무슨 일이 있었나'가 먼저 보여야 합니다. */
+  function findRow(name) {
+    for (var s = 0; s < D.sections.length; s++) {
+      for (var r = 0; r < D.sections[s].rows.length; r++) {
+        if (D.sections[s].rows[r].name === name) return D.sections[s].rows[r];
+      }
+    }
+    return null;
+  }
+
+  var KPI = ['구매 고객(회원+비회원)', '객단가', '재구매 고객(회원+비회원) 비중', '이탈률'];
+  var kpiBox = document.getElementById('kpis');
+  for (var k = 0; k < KPI.length; k++) {
+    var row = findRow(KPI[k]);
+    if (!row) continue;
+    var card = R.el('div', 'kpi');
+    card.appendChild(R.el('div', 'label', row.name));
+    card.appendChild(R.el('div', 'value num', R.fmt(row.values[row.values.length - 1], row.kind)));
+    var foot = R.el('div', 'foot');
+    foot.appendChild(R.el('span', '', '전월대비 '));
+    var g = R.el('span', 'num ' + R.dirClass(row.mom_growth), R.fmtGrowth(row.mom_growth, row.kind));
+    foot.appendChild(g);
+    card.appendChild(foot);
+    kpiBox.appendChild(card);
+  }
+
+  /* ── 섹션 탭 ─────────────────────────────────────────────────── */
+  var tabs = document.getElementById('tabs');
+  var scroller = document.getElementById('scroller');
+  var title = document.getElementById('panel-title');
+  var current = null;
+
+  function show(key, push) {
+    var sec = null, i;
+    for (i = 0; i < D.sections.length; i++) {
+      if (D.sections[i].key === key) sec = D.sections[i];
+    }
+    if (!sec) sec = D.sections[0];
+    current = sec;
+
+    title.textContent = sec.label;
+    scroller.innerHTML = '';
+    scroller.appendChild(R.renderMatrix(sec, D.months));
+
+    var btns = tabs.querySelectorAll('button');
+    for (i = 0; i < btns.length; i++) {
+      btns[i].setAttribute('aria-selected', btns[i].dataset.key === sec.key ? 'true' : 'false');
+    }
+    if (push) R.writeState('sec', sec.key);
+    renderNotes(sec);
+  }
+
+  for (var t = 0; t < D.sections.length; t++) {
+    (function (sec) {
+      var b = R.el('button', '', sec.label);
+      b.type = 'button';
+      b.dataset.key = sec.key;
+      b.setAttribute('role', 'tab');
+      b.onclick = function () { show(sec.key, true); };
+      tabs.appendChild(b);
+    })(D.sections[t]);
+  }
+
+  /* ── 각주 — 그 섹션에 실제로 쓰인 정의만 내립니다 ────────────── */
+  var notesBox = document.getElementById('notes');
+  function renderNotes(sec) {
+    notesBox.innerHTML = '';
+    for (var i = 0; i < D.notes.length; i++) {
+      notesBox.appendChild(R.el('p', '', '※ ' + D.notes[i]));
+    }
+    var dl = R.el('dl'), any = false;
+    for (var r = 0; r < sec.rows.length; r++) {
+      if (!sec.rows[r].note) continue;
+      dl.appendChild(R.el('dt', '', sec.rows[r].name));
+      dl.appendChild(R.el('dd', '', sec.rows[r].note));
+      any = true;
+    }
+    if (any) notesBox.appendChild(dl);
+  }
+
+  document.getElementById('csv').onclick = function () {
+    R.download('고객리포트_' + current.key + '_' + D.base + '.csv',
+               R.toCsv(current, D.months));
+  };
+
+  show(R.readState('sec', D.sections[0].key), false);
+})();
+</script>
+
+</body>
+</html>

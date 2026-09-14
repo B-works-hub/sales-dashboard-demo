@@ -1,0 +1,132 @@
+/* 월간 리포트 공통 — KPI 카드 · 13개월 매트릭스 · 증감 표기 · 각주
+ *
+ * 리포트 5종이 같은 표를 씁니다. 표 하나가 19열(지표 + 13개월 + 월평균 +
+ * 전월대비 2 + 전년동월대비 2)이라 좁은 화면에서는 가로로 흐르고, 지표명
+ * 열만 고정됩니다. 페이지 본문 자체는 절대 가로로 밀리지 않습니다.
+ */
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--plane); color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic",
+               "맑은 고딕", "Apple SD Gothic Neo", system-ui, sans-serif;
+  font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+}
+.num { font-family: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+       font-variant-numeric: tabular-nums; }
+
+.wrap { max-width: 1440px; margin: 0 auto;
+        padding-block: 0 56px; padding-left: 20px; padding-right: 20px; }
+
+/* ── 상단 고지 ─────────────────────────────────────────────────── */
+.notice {
+  background: var(--noteflo-bg); border-bottom: 1px solid var(--noteflo-bd);
+  color: var(--noteflo-ink); text-align: center;
+  padding: 10px 20px; font-size: 13px; line-height: 1.6;
+}
+.notice a { color: inherit; }
+
+/* ── 머리 ──────────────────────────────────────────────────────── */
+.head { display: flex; justify-content: space-between; align-items: flex-start;
+        gap: 20px; flex-wrap: wrap; padding: 34px 0 18px; }
+.head h1 { margin: 0 0 6px; font-size: 25px; letter-spacing: -.4px;
+           border-left: 4px solid var(--accent); padding-left: 12px; }
+.head .sub { margin: 0; padding-left: 16px; color: var(--ink-2); font-size: 13px; }
+.head .meta { text-align: right; font-size: 12.5px; color: var(--ink-muted); }
+.head .meta b { display: block; color: var(--ink-2); font-weight: 700; }
+.crumb { font-size: 12.5px; color: var(--ink-muted); padding-top: 20px; }
+.crumb a { color: var(--accent); text-decoration: none; }
+.crumb a:hover { text-decoration: underline; }
+
+/* ── KPI 카드 ──────────────────────────────────────────────────── */
+.kpis { display: grid; gap: 12px; margin: 4px 0 22px;
+        grid-template-columns: repeat(auto-fit, minmax(212px, 1fr)); }
+.kpi { background: var(--surface); border: 1px solid var(--hairline);
+       border-radius: 12px; padding: 16px 18px; box-shadow: var(--shadow);
+       text-align: center; }
+.kpi .label { font-size: 12px; color: var(--ink-muted); margin-bottom: 6px; }
+.kpi .value { font-size: 25px; font-weight: 700; letter-spacing: -.5px; }
+.kpi .foot  { font-size: 12px; color: var(--ink-2); margin-top: 6px; }
+
+/* ── 섹션 탭 ───────────────────────────────────────────────────── */
+.tabs { display: flex; gap: 4px; flex-wrap: wrap;
+        border-bottom: 1px solid var(--hairline); margin-bottom: 16px; }
+.tabs button {
+  appearance: none; background: none; border: 0; border-bottom: 2px solid transparent;
+  color: var(--ink-2); font: inherit; font-size: 13.5px; padding: 9px 14px;
+  cursor: pointer; border-radius: 8px 8px 0 0; margin-bottom: -1px;
+}
+.tabs button:hover { background: var(--surface-2); color: var(--ink); }
+.tabs button[aria-selected="true"] {
+  color: var(--accent); border-bottom-color: var(--accent);
+  background: var(--accent-soft); font-weight: 700;
+}
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* ── 매트릭스 표 ───────────────────────────────────────────────── */
+.panel { background: var(--surface); border: 1px solid var(--hairline);
+         border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+.panel-head { display: flex; justify-content: space-between; align-items: center;
+              gap: 12px; flex-wrap: wrap; padding: 14px 16px;
+              border-bottom: 1px solid var(--hairline); }
+.panel-head h2 { margin: 0; font-size: 15px; }
+.panel-head .hint { font-size: 12.5px; color: var(--ink-muted); }
+
+.scroller { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 7px 10px; text-align: right; white-space: nowrap;
+         border-bottom: 1px solid var(--hairline); }
+thead th { position: sticky; top: 0; background: var(--surface-2);
+           color: var(--ink-2); font-weight: 700; font-size: 12px; z-index: 2; }
+thead tr.years th { font-size: 11px; color: var(--ink-muted); }
+
+/* 지표명 열 고정 */
+th.metric, td.metric {
+  position: sticky; left: 0; z-index: 1; text-align: left;
+  background: var(--surface); min-width: 178px; font-weight: 400;
+  border-right: 1px solid var(--hairline);
+}
+thead th.metric { z-index: 3; background: var(--surface-2); }
+tbody tr:hover td { background: var(--accent-soft); }
+tbody tr:hover .metric { background: var(--accent-soft); }
+
+td.cur { font-weight: 700; }
+th.cur, td.cur { background: var(--surface-2); }
+tbody tr:hover td.cur { background: var(--accent-soft); }
+td.avg, th.avg { border-left: 1px solid var(--border); }
+td.cmp, th.cmp { color: var(--ink-2); }
+th.grp { text-align: center; border-left: 1px solid var(--border);
+         font-size: 11px; letter-spacing: .03em; }
+
+tr.is-ratio .metric { padding-left: 22px; color: var(--ink-2); font-size: 12.5px;
+                      font-weight: 400; }
+tr.is-ratio td { color: var(--ink-2); }
+tr.is-total td, tr.is-total .metric { font-weight: 700; background: var(--surface-2); }
+
+.up   { color: var(--up); }
+.down { color: var(--down); }
+.flat { color: var(--ink-muted); }
+.nil  { color: var(--ink-muted); }
+
+/* 각주 */
+.notes { margin-top: 18px; font-size: 12.5px; color: var(--ink-muted); }
+.notes p { margin: 0 0 6px; }
+.notes dl { margin: 12px 0 0; display: grid; gap: 4px 14px;
+            grid-template-columns: max-content 1fr; }
+.notes dt { color: var(--ink-2); font-weight: 700; }
+.notes dd { margin: 0; }
+
+/* 버튼 */
+.btn { appearance: none; background: var(--surface); color: var(--ink-2);
+       border: 1px solid var(--hairline); border-radius: 8px;
+       font: inherit; font-size: 12.5px; padding: 6px 12px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .head { padding-top: 22px; }
+  .head h1 { font-size: 21px; }
+  .kpi .value { font-size: 21px; }
+  th.metric, td.metric { min-width: 138px; }
+}

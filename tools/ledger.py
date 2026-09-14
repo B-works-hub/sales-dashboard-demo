@@ -63,7 +63,7 @@ PROMOS = [   # (시작, 종료, 배수, 라벨)
 def _growth(ym):
     """기준월까지 완만히 성장. 2025.11 수출 개시로 한 단 뜁니다."""
     i = M.ALL_MONTHS.index(ym)
-    g = 1.0 + 0.012 * i
+    g = 1.0 + 0.006 * i
     if ym >= (2025, 11):
         g *= 1.18
     return g
@@ -101,13 +101,17 @@ class Customer(object):
         self.joined = joined       # 첫 등장 월
 
 
-def _build_customers(rng, n=26000):
-    """풀을 넉넉히 만들어 두고 월마다 일부만 활성화합니다."""
+def _build_customers(rng, n=30000):
+    """풀을 넉넉히 만들어 두고 월마다 일부만 활성화합니다.
+
+    충성도는 한쪽으로 크게 쏠려 있어야 합니다. 고르게 주면 모두가 한 번씩만
+    사고 사라져 재구매 비중이 절반에도 못 미치고, 반대로 이탈만 쌓입니다.
+    """
     out = []
     for i in range(n):
         member = rng.random() < 0.83
         age = _weighted(rng, M.AGE_BANDS, M.AGE_MIX)
-        loyalty = min(1.0, max(0.0, rng.gauss(0.28, 0.22)))
+        loyalty = min(1.0, max(0.0, rng.gauss(0.50, 0.30)))
         subs = member and rng.random() < 0.035
         joined = M.ALL_MONTHS[rng.randrange(len(M.ALL_MONTHS))]
         out.append(Customer('C%06d' % i, member, age, loyalty, subs, joined))
@@ -172,7 +176,9 @@ def build(scale=1.0):
             for _ in range(n_orders):
                 cust = pool[rng.randrange(len(pool))]
                 # 충성 고객일수록 자주 다시 등장 — 재구매 지표가 살아납니다
-                if rng.random() > 0.35 + cust.loyalty * 0.65:
+                # 충성 고객일수록 다시 뽑힐 확률이 높습니다. 제곱을 써서
+                # 상위 고객으로 기울입니다 — 선형이면 재구매가 안 살아납니다.
+                if rng.random() > cust.loyalty ** 2:
                     continue
 
                 ch = _weighted(rng, open_ch, ch_w)
