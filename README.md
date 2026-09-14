@@ -4,7 +4,7 @@
 것입니다. 실제로 운영 중인 도구의 **데모판**이고, **화면의 숫자·판매처·상품은
 전부 생성된 가상 데이터**입니다.
 
-**[▶ 열어 보기](https://B-works-hub.github.io/sales-dashboard-demo/)**
+**[▶ 열어 보기](https://b-works-hub.github.io/daily-sales-dashboard-demo/)**
 
 ```text
   판매 현황    KPI 카드 4장 · 판매처별 누적 막대 그래프 · 판매처 × 날짜 표
