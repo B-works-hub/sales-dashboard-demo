@@ -4,7 +4,7 @@
 실제로 운영 중인 도구들의 **데모판**이고, **화면의 숫자·판매처·상품은 전부
 생성된 가상 데이터**입니다.
 
-**[▶ 열어 보기](https://b-works-hub.github.io/sales-reports-demo/)**
+**[▶ 열어 보기](https://b-works-hub.github.io/sales-dashboard-demo/)**
 
 ```text
   매일    일일 매출        판매처별 일일 주문금액 · 상품 × 날짜 표 · 메모 · 프로모션 리뷰

@@ -4,7 +4,7 @@
 것입니다. 실제로 운영 중인 도구의 **데모판**이고, **화면의 숫자·판매처·상품은
 전부 생성된 가상 데이터**입니다.
 
-**[▶ 열어 보기](https://b-works-hub.github.io/sales-reports-demo/daily/)**
+**[▶ 열어 보기](https://b-works-hub.github.io/sales-dashboard-demo/daily/)**
 
 이 저장소의 리포트 6종 가운데 하나입니다 — [전체 보기](../README.md)
 
