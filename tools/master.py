@@ -135,16 +135,20 @@ DAILY_CHANNEL_NAMES = [
 # ── 제품 ────────────────────────────────────────────────────────────
 # 카테고리 4 > 라인 14 > SKU. 라인 코드는 제품 유형의 영문 약어이고,
 # 어떤 브랜드의 내부 코드도 아닙니다.
-CATEGORIES = ['HOME CARE', 'FRAGRANCE', 'HAND CARE', 'HAIR & BODY']
+# 원본 리포트의 카테고리 체계입니다. ACCESSORIES 와 OTHER 는 제품이 아니라
+# 파우치·기프트백·에디션 같은 부속과 그 밖의 항목을 담는 자리인데, 매출에는
+# 잡히므로 빼면 총계가 안 맞습니다.
+CATEGORIES = ['HOME CARE', 'MIND CARE', 'HAND CARE', 'HAIR & BODY',
+              'ACCESSORIES', 'OTHER']
 
 LINES = [
-    dict(code='MSP', name='멀티스프레이',   cat='HOME CARE',   weight=0.30, refill=True),
+    dict(code='MSP', name='멀티스프레이',   cat='HOME CARE',   weight=0.28, refill=True),
     dict(code='ASP', name='공간스프레이',   cat='HOME CARE',   weight=0.06, refill=True),
-    dict(code='LDT', name='세탁세제',       cat='HOME CARE',   weight=0.09, refill=True),
-    dict(code='RMS', name='룸스프레이',     cat='FRAGRANCE',   weight=0.14, refill=False),
-    dict(code='SCH', name='향낭',           cat='FRAGRANCE',   weight=0.05, refill=False),
-    dict(code='EPL', name='아이필로우',     cat='FRAGRANCE',   weight=0.02, refill=False),
-    dict(code='AOL', name='아로마오일',     cat='FRAGRANCE',   weight=0.04, refill=False),
+    dict(code='LDT', name='세탁세제',       cat='HOME CARE',   weight=0.08, refill=True),
+    dict(code='RMS', name='룸스프레이',     cat='MIND CARE',   weight=0.13, refill=False),
+    dict(code='SCH', name='향낭',           cat='MIND CARE',   weight=0.05, refill=False),
+    dict(code='EPL', name='아이필로우',     cat='MIND CARE',   weight=0.02, refill=False),
+    dict(code='AOL', name='아로마오일',     cat='MIND CARE',   weight=0.04, refill=False),
     dict(code='HWS', name='핸드워시',       cat='HAND CARE',   weight=0.07, refill=True),
     dict(code='HBM', name='핸드밤',         cat='HAND CARE',   weight=0.06, refill=False),
     dict(code='SOP', name='비누',           cat='HAIR & BODY', weight=0.04, refill=False),
@@ -152,51 +156,113 @@ LINES = [
     dict(code='BLT', name='바디로션',       cat='HAIR & BODY', weight=0.04, refill=True),
     dict(code='SHP', name='샴푸',           cat='HAIR & BODY', weight=0.02, refill=True),
     dict(code='CDT', name='컨디셔너',       cat='HAIR & BODY', weight=0.02, refill=False),
+    dict(code='ACC', name='부속',           cat='ACCESSORIES', weight=0.03, refill=False),
+    dict(code='ETC', name='기타',           cat='OTHER',       weight=0.01, refill=False),
 ]
 
 LINE_BY_CODE = dict((l['code'], l) for l in LINES)
 
 
+# 변형 그룹 — 원본은 라인 아래에 refill / bottle 한 단을 더 둡니다.
+# 리필을 본품과 나란히 놓으면 '본품을 산 사람이 리필까지 갔는가' 가 표에서
+# 안 보입니다. 그래서 한 단을 더 씁니다.
+VARIANTS = ['bottle', 'refill', 'set']
+
+VARIANT_LABEL = {'bottle': '본품', 'refill': '리필', 'set': '세트'}
+
+
 def _skus():
-    """라인마다 본품 / 리필 / 세트를 깝니다. 가격은 전부 가상입니다."""
+    """단품 SKU. 라인마다 본품 / 리필 / (일부) 세트를 깝니다.
+
+    variant 가 원본의 refill·bottle 계층 자리이고, 가격은 전부 가상입니다.
+    """
     base = {
-        'MSP': [('본품 300ml', 32000), ('리필 450ml', 26000), ('리필 900ml', 45000), ('기프트 세트', 58000)],
-        'ASP': [('본품 110ml', 29000), ('리필 500ml', 24000)],
-        'LDT': [('본품 1.2L', 34000), ('리필 1.6L', 28000)],
-        'RMS': [('110ml', 59000), ('50ml', 39000), ('기프트 세트', 88000)],
-        'SCH': [('싱글', 19000), ('키트', 22000)],
-        'EPL': [('베이직', 42000)],
-        'AOL': [('7ml', 36000), ('15ml', 62000)],
-        'HWS': [('본품 450ml', 42000), ('리필 900ml', 56000)],
-        'HBM': [('35ml', 25000), ('핸드 세트', 49000)],
-        'SOP': [('90g', 29000), ('3입 세트', 76000)],
-        'BWS': [('450ml', 43000), ('리필 900ml', 58000)],
-        'BLT': [('300ml', 41000), ('리필 700ml', 55000)],
-        'SHP': [('450ml', 39000), ('리필 800ml', 52000)],
-        'CDT': [('450ml', 39000)],
+        'MSP': [('본품 300ml', 32000, 'bottle'), ('리필 450ml', 26000, 'refill'),
+                ('리필 900ml', 45000, 'refill'), ('기프트 세트', 58000, 'set')],
+        'ASP': [('본품 110ml', 29000, 'bottle'), ('리필 500ml', 24000, 'refill')],
+        'LDT': [('본품 1.2L', 34000, 'bottle'), ('리필 1.6L', 28000, 'refill')],
+        'RMS': [('110ml', 59000, 'bottle'), ('50ml', 39000, 'bottle'),
+                ('기프트 세트', 88000, 'set')],
+        'SCH': [('싱글', 19000, 'bottle'), ('키트', 22000, 'set')],
+        'EPL': [('베이직', 42000, 'bottle')],
+        'AOL': [('7ml', 36000, 'bottle'), ('15ml', 62000, 'bottle')],
+        'HWS': [('본품 450ml', 42000, 'bottle'), ('리필 900ml', 56000, 'refill')],
+        'HBM': [('35ml', 25000, 'bottle'), ('핸드 세트', 49000, 'set')],
+        'SOP': [('90g', 29000, 'bottle'), ('3입 세트', 76000, 'set')],
+        'BWS': [('450ml', 43000, 'bottle'), ('리필 900ml', 58000, 'refill')],
+        'BLT': [('300ml', 41000, 'bottle'), ('리필 700ml', 55000, 'refill')],
+        'SHP': [('450ml', 39000, 'bottle'), ('리필 800ml', 52000, 'refill')],
+        'CDT': [('450ml', 39000, 'bottle')],
+        'ACC': [('파우치 S', 12000, 'bottle'), ('파우치 M', 18000, 'bottle'),
+                ('기프트백 L', 9000, 'bottle'), ('세라믹 홀더', 46000, 'bottle')],
+        'ETC': [('시즌 에디션', 88000, 'bottle'), ('사이즈업 할인', 15000, 'bottle')],
     }
     out = []
     for line in LINES:
-        for i, (variant, price) in enumerate(base[line['code']], 1):
+        for i, (variant, price, vg) in enumerate(base[line['code']], 1):
             out.append(dict(
                 sku='%s-%02d' % (line['code'], i * 10),
-                line=line['code'],
-                cat=line['cat'],
+                line=line['code'], cat=line['cat'], variant=vg,
                 name='%s %s' % (line['name'], variant),
-                price=price,
-                is_refill='리필' in variant,
-                is_gift='세트' in variant,
+                price=price, is_refill=(vg == 'refill'), is_gift=(vg == 'set'),
+                is_bundle=False,
             ))
     return out
 
 
-SKUS = _skus()
+def _bundles():
+    """세트 상품 — 원본의 DETAILS 구획입니다.
+
+    여러 라인을 묶은 상품이라 '어느 라인의 매출인가' 가 하나로 안 정해집니다.
+    원본이 단품(SUMMARY)과 세트(DETAILS)를 아예 다른 구획으로 나눠 놓은
+    이유이고, 여기서도 대표 라인만 달아 두고 구획을 분리합니다.
+    """
+    spec = [
+        ('MSP', [('450ml 세트', 58000), ('900ml 세트', 92000), ('기프트 세트', 74000),
+                 ('차량용 세트', 46000), ('반려동물 세트', 52000), ('모닝리추얼 세트', 68000)]),
+        ('ASP', [('공간 세트', 54000), ('리필 2입 세트', 44000)]),
+        ('LDT', [('세탁 세트', 60000), ('대용량 2입', 52000)]),
+        ('RMS', [('룸스프레이 2종 세트', 98000), ('미니 3종 세트', 72000),
+                 ('시즌 한정 세트', 118000)]),
+        ('SCH', [('향낭 키트', 38000), ('향낭 리필 세트', 30000)]),
+        ('AOL', [('오일 2종 세트', 86000)]),
+        ('HWS', [('핸드 듀오', 66000), ('핸드 케어 세트', 84000)]),
+        ('HBM', [('핸드밤 3입', 66000), ('트래블 키트', 42000)]),
+        ('SOP', [('솝 12입', 108000), ('미니 솝 세트', 34000)]),
+        ('BWS', [('바디 듀오', 78000), ('바디 풀세트', 124000)]),
+        ('BLT', [('로션 2입', 74000)]),
+        ('SHP', [('헤어 듀오', 72000), ('헤어 풀세트', 96000)]),
+        ('ACC', [('기프트 패키지 S', 28000), ('기프트 패키지 L', 54000)]),
+        ('ETC', [('면세 세트', 82000), ('B2B 대량 세트', 140000)]),
+    ]
+    out = []
+    n = 0
+    for code, items in spec:
+        line = LINE_BY_CODE[code]
+        for name, price in items:
+            n += 1
+            out.append(dict(
+                sku='S%04d' % (n * 7), line=code, cat=line['cat'], variant='set',
+                name='%s %s' % (line['name'], name), price=price,
+                is_refill=False, is_gift=True, is_bundle=True,
+            ))
+    return out
+
+
+SINGLES = _skus()          # 원본 SUMMARY 구획
+BUNDLES = _bundles()       # 원본 DETAILS 구획
+SKUS = SINGLES + BUNDLES
 SKU_BY_CODE = dict((s['sku'], s) for s in SKUS)
 
 
 # ── 플래그십 매장 ───────────────────────────────────────────────────
 # 국적은 실제 관광 통계에서도 흔한 구분이라 일반명사로 둡니다.
 NATIONS   = ['일본', '대만', '중국', '싱가포르', '미국', '그 외']
+
+# 수출 채널의 도착국. 플래그십 방문객의 국적과는 다른 축입니다 — 하나는
+# 매장에 온 사람, 하나는 물건이 나간 나라입니다. 원본도 YTD 구간에서만
+# 이 분해를 답니다.
+EXPORT_NATIONS = ['싱가포르', '일본', '대만', '홍콩', '미국']
 WEEKDAYS  = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일']
 HOURS     = ['%02d:00-%02d:00' % (h, h + 1) for h in range(10, 20)]
 
@@ -207,7 +273,7 @@ AGE_MIX   = [0.001, 0.03, 0.20, 0.24, 0.15, 0.04, 0.01, 0.329]
 
 def selftest():
     assert len(CHANNELS) == len(set(CHANNEL_KEYS)), '채널 키 중복'
-    assert len(LINES) == 14, '제품라인은 14개'
+    assert len(LINES) == 16, '제품라인은 16개'
     assert abs(sum(l['weight'] for l in LINES) - 1.0) < 1e-9, '라인 가중치 합이 1이 아님'
     assert abs(sum(c['weight'] for c in CHANNELS) - 1.0) < 1e-9, '채널 가중치 합이 1이 아님'
     assert abs(sum(c['freq'] for c in CHANNELS) - 1.0) < 1e-9, '빈도 가중치 합이 1이 아님'
@@ -225,11 +291,21 @@ def selftest():
     # 조용히 0% 로 나옵니다. 지표가 0 인 건지 제품이 없는 건지 화면에서
     # 구분이 안 되므로 여기서 막습니다.
     for l in LINES:
-        has = any(s['is_refill'] for s in SKUS if s['line'] == l['code'])
+        has = any(s['is_refill'] for s in SINGLES if s['line'] == l['code'])
         assert has == l['refill'], \
             '%s: refill=%s 인데 리필 SKU 는 %s' % (l['code'], l['refill'], has)
+    # 카테고리마다 라인이 최소 하나는 있어야 계층이 빈 칸으로 끊기지 않습니다
+    for c in CATEGORIES:
+        assert any(l['cat'] == c for l in LINES), '%s 에 라인이 없습니다' % c
+    # 변형 그룹은 셋뿐입니다 — 새 값이 들어오면 계층 렌더가 조용히 빠뜨립니다
+    bad = set(s['variant'] for s in SKUS) - set(VARIANTS)
+    assert not bad, '모르는 변형 그룹: %s' % bad
+    # 세트는 DETAILS 구획으로만 갑니다
+    assert all(s['is_bundle'] for s in BUNDLES)
+    assert not any(s['is_bundle'] for s in SINGLES)
     return dict(months=len(ALL_MONTHS), channels=len(CHANNELS),
-                lines=len(LINES), skus=len(SKUS))
+                categories=len(CATEGORIES), lines=len(LINES),
+                singles=len(SINGLES), bundles=len(BUNDLES))
 
 
 if __name__ == '__main__':

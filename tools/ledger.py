@@ -19,7 +19,8 @@ SEED = 20260714
 
 # 주문 라인 한 줄의 모양
 FIELDS = ('date', 'order', 'cust', 'member', 'age', 'channel',
-          'sku', 'line', 'qty', 'amount', 'gift', 'subs', 'nation', 'hour')
+          'sku', 'line', 'qty', 'amount', 'gift', 'subs', 'nation', 'hour',
+          'dest')
 
 
 class Row(object):
@@ -139,9 +140,13 @@ def build(scale=1.0):
 
     line_codes   = [l['code'] for l in M.LINES]
     line_weights = [l['weight'] for l in M.LINES]
-    sku_by_line  = {}
-    for s in M.SKUS:
-        sku_by_line.setdefault(s['line'], []).append(s)
+    # 단품과 세트를 따로 담습니다. 한 바구니에서 뽑으면 세트가 라인마다
+    # 개수가 달라 비중이 라인 가중치와 어긋납니다.
+    single_by_line, bundle_by_line = {}, {}
+    for s in M.SINGLES:
+        single_by_line.setdefault(s['line'], []).append(s)
+    for s in M.BUNDLES:
+        bundle_by_line.setdefault(s['line'], []).append(s)
 
     for ym in M.ALL_MONTHS:
         # 그 달에 열려 있는 채널만 — 종료한 채널은 종료월까지만 팝니다.
@@ -187,6 +192,10 @@ def build(scale=1.0):
                 gift = rng.random() < (0.22 if ym[1] == 12 else 0.09)
                 nation = None
                 hour = None
+                dest = None
+                if ch['key'] == '수출':
+                    dest = _weighted(rng, M.EXPORT_NATIONS,
+                                     [0.34, 0.26, 0.18, 0.12, 0.10])
                 if ch['key'] == '플래그십':
                     # 매장은 외국인 비중이 높고 해마다 오릅니다
                     foreign = rng.random() < (0.30 + 0.10 * (ym[0] - 2024))
@@ -204,7 +213,13 @@ def build(scale=1.0):
                     if code in picked:
                         continue
                     picked.add(code)
-                    sku = sku_by_line[code][rng.randrange(len(sku_by_line[code]))]
+                    # 세트는 선물 시즌과 기프트 주문에서 더 자주 나갑니다.
+                    sku_pool = single_by_line[code]
+                    if bundle_by_line.get(code):
+                        p_bundle = 0.34 if gift else (0.22 if ym[1] == 12 else 0.14)
+                        if rng.random() < p_bundle:
+                            sku_pool = bundle_by_line[code]
+                    sku = sku_pool[rng.randrange(len(sku_pool))]
                     qty = 1 + (rng.random() < 0.20 * bk) + (rng.random() < 0.04 * bk)
                     if ch['bulk'] > 1:
                         # 건당 수량 배수. 평균이 bulk 가 되도록 ±40% 로 흔듭니다.
@@ -214,7 +229,7 @@ def build(scale=1.0):
                         age=cust.age, channel=ch['key'], sku=sku['sku'],
                         line=code, qty=qty, amount=qty * sku['price'],
                         gift=gift or sku['is_gift'], subs=cust.subs,
-                        nation=nation, hour=hour,
+                        nation=nation, hour=hour, dest=dest,
                     ))
 
     return rows, customers

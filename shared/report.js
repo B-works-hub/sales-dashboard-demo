@@ -302,10 +302,253 @@ var Report = (function () {
     history.replaceState(null, '', location.pathname + '?' + params.join('&'));
   }
 
+  /* ── 원본 시트 표 (품목별 판매 현황) ──────────────────────────────
+     327행 × 245열짜리 시트를 그대로 옮긴 표입니다. 매트릭스·히트맵과 달리
+     여기서는 **읽기 좋게 고치지 않는 것**이 목적입니다 — 원본을 쓰던 사람이
+     같은 자리에서 같은 숫자를 찾을 수 있어야 합니다.
+
+     다만 두 가지는 바꿉니다.
+       · 라벨을 왼쪽에 고정 — 원본은 155열, 표 한가운데입니다. 종이에서는
+         되지만 가로 스크롤에서는 이름이 화면 밖으로 나갑니다.
+       · 계층을 들여쓰기로 — 원본은 굵기로만 구분해 4단이 한 칸에 겹칩니다.
+
+     `shr` 은 싣지 않고 여기서 나눕니다. 분모는 언제나 **그 기간 ALL 행의
+     값**이라 값 하나당 한 번의 나눗셈이면 되고, 파일이 절반으로 줄어듭니다. */
+
+  function wideCols(D, opt) {
+    var cols = [];
+    var C = D.cols, i;
+
+    function pair(m, per, label, blk, field, idx, den, cls) {
+      var t;
+      for (t = 0; t < 2; t++) {
+        cols.push({ m: m, per: per, g3: label, blk: blk, f: field, i: idx,
+                    den: den, cls: cls || '', t: t ? 's' : 'v' });
+      }
+    }
+    function grow(m, per, label, blk, now, was) {
+      cols.push({ m: m, per: per, g3: label, blk: blk, now: now, was: was,
+                  cls: 'cmp', t: 'g' });
+    }
+
+    var MEAS = [{ k: 'qty', label: '수량' }, { k: 'val', label: '금액' }];
+    for (var mi = 0; mi < MEAS.length; mi++) {
+      var m = MEAS[mi].label, mk = MEAS[mi].k;
+      var mtd = mk + '|mtd', ytd = mk + '|ytd';
+
+      pair(m, 'MTD', C.py, mtd, 'py', null, 'py');
+      pair(m, 'MTD', C.cur, mtd, 'cur', null, 'cur', 'cur');
+      if (opt.ch) {
+        for (i = 0; i < D.channels.length; i++) {
+          pair(m, 'MTD', D.channels[i].key, mtd, 'cur_ch', i, 'cur',
+               D.channels[i].inactive ? 'off' : '');
+        }
+      }
+      grow(m, 'MTD', 'YoY', mtd, 'cur', 'py');
+      pair(m, 'MTD', C.pm, mtd, 'pm', null, 'pm');
+      /* 금액 MTD 의 전월에는 채널 분해가 없습니다 — 원본 그대로입니다. */
+      if (opt.ch && D.grid[mtd].pm_ch) {
+        for (i = 0; i < D.channels.length; i++) {
+          pair(m, 'MTD', D.channels[i].key, mtd, 'pm_ch', i, 'pm',
+               D.channels[i].inactive ? 'off' : '');
+        }
+      }
+      grow(m, 'MTD', 'MoM', mtd, 'cur', 'pm');
+
+      pair(m, 'YTD', C.y_all, ytd, 'y_all', null, 'y_all');
+      pair(m, 'YTD', C.y_ytd, ytd, 'y_ytd', null, 'y_ytd');
+      pair(m, 'YTD', C.cur, ytd, 'cur', null, 'cur', 'cur');
+      if (opt.ch) {
+        for (i = 0; i < D.channels.length; i++) {
+          pair(m, 'YTD', D.channels[i].key, ytd, 'cur_ch', i, 'cur',
+               D.channels[i].inactive ? 'off' : '');
+        }
+      }
+      if (opt.nat) {
+        for (i = 0; i < D.nations.length; i++) {
+          pair(m, 'YTD', D.nations[i], ytd, 'cur_nat', i, 'cur', 'nat');
+        }
+      }
+      grow(m, 'YTD', 'YoY', ytd, 'cur', 'y_ytd');
+    }
+    return cols;
+  }
+
+  function wideRaw(D, c, r) {
+    var b = D.grid[c.blk];
+    if (c.t === 'g') {
+      var was = b[c.was][r], now = b[c.now][r];
+      return was ? now / was - 1 : null;
+    }
+    var v = (c.i === null || c.i === undefined) ? b[c.f][r] : b[c.f][r][c.i];
+    if (c.t === 'v') return v;
+    var den = b[c.den][0];
+    return den ? v / den : null;
+  }
+
+  function wideText(D, c, r) {
+    var v = wideRaw(D, c, r);
+    if (c.t === 'g') return v === null ? '–' : fmtGrowth(v, 'int');
+    if (c.t === 's') return (v === null || v === 0) ? '–' : v.toFixed(2);
+    if (!v) return '–';
+    return fmt(v, c.m === '금액' ? 'krw' : 'int');
+  }
+
+  /* 계층 접기 — 어느 행이 자식을 갖는지는 '다음 행의 단이 더 깊은가' 로
+     정해집니다. 구획(SUMMARY / DETAILS)을 넘어가면 자식이 아닙니다. */
+  function wideTree(rows) {
+    var kids = [], parent = [], i, j;
+    for (i = 0; i < rows.length; i++) {
+      kids.push(i + 1 < rows.length &&
+                rows[i + 1].lv > rows[i].lv &&
+                rows[i + 1].sec === rows[i].sec);
+      parent.push(-1);
+      for (j = i - 1; j >= 0; j--) {
+        if (rows[j].sec !== rows[i].sec) break;
+        if (rows[j].lv < rows[i].lv) { parent[i] = j; break; }
+      }
+    }
+    return { kids: kids, parent: parent };
+  }
+
+  function wideVisible(rows, tree, open) {
+    var vis = [];
+    for (var i = 0; i < rows.length; i++) {
+      var p = tree.parent[i], ok = true;
+      while (p >= 0) {
+        if (!open[p]) { ok = false; break; }
+        p = tree.parent[p];
+      }
+      if (ok) vis.push(i);
+    }
+    return vis;
+  }
+
+  function renderWide(D, opt, onToggle) {
+    var cols = wideCols(D, opt);
+    var rows = D.rows;
+    var tree = wideTree(rows);
+    var vis = wideVisible(rows, tree, opt.open);
+    var table = el('table', 'wide');
+    var i, j, tr;
+
+    /* 머리 4줄 — 수량|금액 / MTD|YTD / 기간·채널 / 값·shr.
+       위 세 줄은 같은 값이 이어지는 만큼 묶습니다. */
+    var thead = el('thead');
+    var levels = [
+      function (c) { return c.m; },
+      function (c) { return c.m + '|' + c.per; },
+      function (c) { return c.m + '|' + c.per + '|' + c.g3; }
+    ];
+    var labels = [
+      function (c) { return c.m; },
+      function (c) { return c.per; },
+      function (c) { return c.g3; }
+    ];
+    for (var lv = 0; lv < 3; lv++) {
+      tr = el('tr', 'h' + (lv + 1));
+      tr.appendChild(el('th', 'metric', lv === 2 ? '품목' : ''));
+      i = 0;
+      while (i < cols.length) {
+        j = i;
+        while (j < cols.length && levels[lv](cols[j]) === levels[lv](cols[i])) j++;
+        var th = el('th', 'grp ' + (cols[i].cls || ''));
+        th.colSpan = j - i;
+        /* 수량/금액·MTD/YTD 는 100열이 넘게 이어집니다. 칸 가운데에 두면
+           가로로 밀었을 때 라벨이 화면 밖으로 나가 '지금 어느 블록인가' 를
+           알 수 없습니다 — 라벨만 왼쪽에 붙여 둡니다. */
+        th.appendChild(el('span', lv < 2 ? 'stick' : '', labels[lv](cols[i])));
+        tr.appendChild(th);
+        i = j;
+      }
+      thead.appendChild(tr);
+    }
+    tr = el('tr', 'h4');
+    tr.appendChild(el('th', 'metric', ''));
+    for (i = 0; i < cols.length; i++) {
+      var c = cols[i];
+      tr.appendChild(el('th', 'sub ' + (c.cls || ''),
+                        c.t === 'g' ? '증감' : (c.t === 's' ? 'shr' : '값')));
+    }
+    thead.appendChild(tr);
+    table.appendChild(thead);
+
+    var tbody = el('tbody');
+    for (var vi = 0; vi < vis.length; vi++) {
+      var r = vis[vi], row = rows[r];
+      tr = el('tr', 'lv' + row.lv + (row.total ? ' is-total' : '') +
+                    (row.sec === 'det' ? ' is-det' : ''));
+      var cell = el('th', 'metric');
+      cell.scope = 'row';
+      cell.style.paddingLeft = (10 + row.lv * 14) + 'px';
+      if (tree.kids[r]) {
+        (function (idx) {
+          var btn = el('button', 'tw', opt.open[idx] ? '▾' : '▸');
+          btn.type = 'button';
+          btn.setAttribute('aria-expanded', opt.open[idx] ? 'true' : 'false');
+          btn.setAttribute('aria-label',
+                           rows[idx].name + (opt.open[idx] ? ' 접기' : ' 펼치기'));
+          btn.onclick = function () { onToggle(idx); };
+          cell.appendChild(btn);
+        })(r);
+      } else {
+        cell.appendChild(el('span', 'tw-none', ''));
+      }
+      var nm = el('span', 'nm', row.name);
+      if (row.code) nm.title = row.code;
+      cell.appendChild(nm);
+      tr.appendChild(cell);
+
+      for (i = 0; i < cols.length; i++) {
+        var col = cols[i];
+        var raw = wideRaw(D, col, r);
+        var cls = 'num ' + (col.cls || '') + (col.t === 's' ? ' shr' : '');
+        if (col.t === 'g') cls += ' ' + dirClass(raw);
+        if (raw === null || raw === 0) cls += ' nil';
+        tr.appendChild(el('td', cls, wideText(D, col, r)));
+      }
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function wideCsv(D, opt) {
+    var cols = wideCols(D, opt);
+    var rows = D.rows;
+    var tree = wideTree(rows);
+    var vis = wideVisible(rows, tree, opt.open);
+    var out = [], i, line;
+
+    var heads = [
+      ['', function (c) { return c.m; }],
+      ['', function (c) { return c.per; }],
+      ['품목', function (c) { return c.g3; }],
+      ['', function (c) { return c.t === 'g' ? '증감' : (c.t === 's' ? 'shr' : '값'); }]
+    ];
+    for (var h = 0; h < heads.length; h++) {
+      line = [csvCell(heads[h][0])];
+      for (i = 0; i < cols.length; i++) line.push(csvCell(heads[h][1](cols[i])));
+      out.push(line.join(','));
+    }
+    for (var vi = 0; vi < vis.length; vi++) {
+      var r = vis[vi];
+      var indent = new Array(rows[r].lv + 1).join('  ');
+      line = [csvCell(indent + rows[r].name)];
+      for (i = 0; i < cols.length; i++) {
+        var v = wideRaw(D, cols[i], r);
+        line.push(v === null ? '' : String(v));
+      }
+      out.push(line.join(','));
+    }
+    return out.join('\r\n');
+  }
+
   return {
     fmt: fmt, fmtDelta: fmtDelta, fmtGrowth: fmtGrowth, dirClass: dirClass,
     renderMatrix: renderMatrix, renderCross: renderCross,
     heatLegend: heatLegend, crossCsv: crossCsv, toCsv: toCsv, download: download,
-    readState: readState, writeState: writeState, el: el, comma: comma
+    readState: readState, writeState: writeState, el: el, comma: comma,
+    renderWide: renderWide, wideCsv: wideCsv, wideTree: wideTree
   };
 })();

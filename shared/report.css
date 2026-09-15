@@ -173,3 +173,71 @@ table.heat thead th.grp { border-left: 1px solid var(--border); }
   .kpi .value { font-size: 21px; }
   th.metric, td.metric { min-width: 138px; }
 }
+
+/* ── 원본 시트 표 (품목별 판매 현황) ─────────────────────────────────
+   240열짜리 표입니다. 열을 줄이는 대신 **머리 4줄을 전부 고정**하고
+   품목 열을 왼쪽에 붙여, 가로로 아무리 밀어도 '어느 품목의 어느 기간
+   어느 채널인가' 가 화면에 남게 합니다.
+
+   머리줄마다 top 을 따로 줍니다 — thead 는 통째로 고정되지 않습니다. */
+table.wide { width: auto; font-size: 12px; }
+table.wide th, table.wide td { padding: 4px 8px; height: 25px; }
+table.wide thead th { z-index: 2; }
+table.wide thead tr.h1 th { top: 0; }
+table.wide thead tr.h2 th { top: 25px; }
+table.wide thead tr.h3 th { top: 50px; }
+table.wide thead tr.h4 th { top: 75px; }
+table.wide thead tr.h1 th { font-size: 12px; letter-spacing: .06em;
+                            border-left: 1px solid var(--border); }
+table.wide thead tr.h2 th { border-left: 1px solid var(--border); }
+table.wide thead tr.h3 th { font-size: 11px; font-weight: 400; color: var(--ink-2); }
+table.wide thead tr.h4 th { font-size: 10px; font-weight: 400;
+                            letter-spacing: .04em; }
+table.wide thead th.metric { z-index: 4; }
+/* shr 은 값이지 장식이 아닙니다 — 11px 에 --ink-muted 를 쓰면 밝은 테마의
+   surface-2 위에서 2.8:1 로 떨어집니다. 작게만 두고 색은 본문 계열로. */
+table.wide td.shr, table.wide th.sub { color: var(--ink-2); }
+table.wide td.shr { font-size: 11px; }
+table.wide td.cur { background: var(--surface-2); font-weight: 700; }
+table.wide tbody tr:hover td.cur { background: var(--accent-soft); }
+table.wide th.grp.cur, table.wide th.sub.cur { background: var(--surface-2); }
+/* 거래 종료 채널. 창 안에 값이 남아 있는 열이므로(2025 누계는 종료 전
+   달을 포함합니다) 흐리게 지우지 않고, 머리에만 취소선을 답니다. */
+table.wide thead th.off > span { text-decoration: line-through;
+                                 text-decoration-color: var(--ink-muted); }
+table.wide th.metric, table.wide td.metric { min-width: 232px; z-index: 3; }
+
+/* 계층 — 굵기 대신 들여쓰기로 보입니다. */
+table.wide tbody tr.lv0 th.metric { font-weight: 700; }
+table.wide tbody tr.lv1 th.metric { font-weight: 700; }
+table.wide tbody tr.lv2 th.metric { font-weight: 600; }
+table.wide tbody tr.lv3 th.metric { color: var(--ink-2); font-style: italic; }
+table.wide tbody tr.lv4 th.metric { color: var(--ink-2); font-weight: 400; }
+table.wide tbody tr.lv0 td, table.wide tbody tr.lv1 td { font-weight: 700; }
+table.wide tbody tr.is-total td, table.wide tbody tr.is-total th.metric {
+  background: var(--surface-2);
+}
+table.wide tbody tr.is-det.lv0 th.metric { border-top: 2px solid var(--border); }
+table.wide tbody tr.is-det.lv0 td { border-top: 2px solid var(--border); }
+
+/* 펼침 삼각형 */
+.tw { appearance: none; background: none; border: 0; cursor: pointer;
+      color: var(--ink-muted); font: inherit; font-size: 10px;
+      width: 16px; padding: 0; margin-right: 4px; line-height: 1; }
+.tw:hover { color: var(--accent); }
+.tw:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tw-none { display: inline-block; width: 16px; margin-right: 4px; }
+
+/* 보기 토글 줄 */
+.opts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+        margin: 4px 0 16px; }
+.opts .btn[aria-pressed="true"] { background: var(--accent); color: #fff;
+                                  border-color: var(--accent); font-weight: 700; }
+
+/* 100열 넘게 이어지는 그룹 라벨은 칸 가운데가 아니라 왼쪽에 붙여 둡니다.
+   가운데 두면 가로로 민 순간 '지금 수량인가 금액인가' 가 사라집니다. */
+table.wide thead th.grp { text-align: left; }
+table.wide thead th.grp > span.stick {
+  position: sticky; left: 244px; display: inline-block;
+}
+table.wide thead tr.h3 th.grp, table.wide thead tr.h4 th { text-align: center; }

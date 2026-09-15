@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>품목별 판매 현황 — 데모</title>
+<link rel="stylesheet" href="../shared/tokens.css">
+<link rel="stylesheet" href="../shared/report.css">
+<script src="../data/items.js"></script>
+<script src="../shared/report.js"></script>
+</head>
+<body>
+
+<div class="notice">
+  데모 화면의 숫자·판매처·상품은 <b>전부 생성된 가상 데이터</b>입니다.
+  실물은 구글 계정 로그인 뒤 시트에서 값을 받아 그립니다 —
+  <a href="https://github.com/B-works-hub/sales-dashboard-demo#readme">구조 설명</a>
+</div>
+
+<div class="wrap">
+  <div class="crumb"><a href="../">← 매출 리포트</a></div>
+
+  <div class="head">
+    <div>
+      <h1>품목별 판매 현황</h1>
+      <p class="sub">원본 시트의 표 그대로 — 품목 5단 × 채널 · 수량 / 금액 · MTD / YTD</p>
+    </div>
+    <div class="meta">
+      <b id="meta-base"></b>
+      <span id="meta-size"></span>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="opts">
+    <button class="btn" id="t-ch"  type="button" aria-pressed="true">채널별 열</button>
+    <button class="btn" id="t-nat" type="button" aria-pressed="false">수출 국가별 열</button>
+    <span style="width:8px"></span>
+    <button class="btn" id="t-open"  type="button">전부 펼치기</button>
+    <button class="btn" id="t-close" type="button">라인까지만</button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2 id="panel-title"></h2>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <span class="hint" id="hint"></span>
+        <button class="btn" id="csv" type="button">CSV 다운로드</button>
+      </div>
+    </div>
+    <div class="scroller" id="scroller"></div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var D = ITEMS_DATA;
+  var R = Report;
+
+  document.getElementById('meta-base').textContent = '기준월 ' + D.base;
+
+  /* 어느 행이 자식을 갖는지는 렌더러와 같은 규칙으로 정합니다 — 여기서
+     따로 세면 '펼치기' 와 삼각형이 어긋납니다. */
+  var tree = R.wideTree(D.rows);
+
+  var opt = {
+    ch:  R.readState('ch',  '1') !== '0',
+    nat: R.readState('nat', '0') === '1',
+    open: {}
+  };
+
+  /* 기본은 제품라인까지. 변형·SKU 까지 펴면 132행이 한 번에 쏟아집니다.
+     DETAILS 구획은 한 단이 얕습니다(세트 합계 → 라인 → SKU) — 같은 깊이를
+     그대로 쓰면 세트만 SKU 까지 펼쳐져 두 구획이 어긋나 보입니다. */
+  function openTo(depth) {
+    opt.open = {};
+    for (var i = 0; i < D.rows.length; i++) {
+      var d = D.rows[i].sec === 'det' ? depth - 1 : depth;
+      if (tree.kids[i] && D.rows[i].lv < d) opt.open[i] = true;
+    }
+  }
+  function openAll() {
+    opt.open = {};
+    for (var i = 0; i < D.rows.length; i++) if (tree.kids[i]) opt.open[i] = true;
+  }
+  openTo(2);          // ALL · 카테고리 펼침 → 제품라인까지 보입니다
+
+  var scroller = document.getElementById('scroller');
+
+  function pct(now, was) {
+    return was ? now / was - 1 : null;
+  }
+
+  /* KPI — 원본의 SUMMARY 시트가 내주던 넉 장입니다.
+     ALL 행의 당월/누계 × 수량/금액과 그 증감. */
+  function renderKpis() {
+    var box = document.getElementById('kpis');
+    box.innerHTML = '';
+    var specs = [
+      ['당월 수량', 'qty|mtd', 'cur', 'py', 'int', '전년동월'],
+      ['당월 금액', 'val|mtd', 'cur', 'py', 'krw', '전년동월'],
+      ['누계 수량', 'qty|ytd', 'cur', 'y_ytd', 'int', '전년동기'],
+      ['누계 금액', 'val|ytd', 'cur', 'y_ytd', 'krw', '전년동기']
+    ];
+    for (var i = 0; i < specs.length; i++) {
+      var s = specs[i], b = D.grid[s[1]];
+      var now = b[s[2]][0], was = b[s[3]][0], g = pct(now, was);
+      var card = R.el('div', 'kpi');
+      card.appendChild(R.el('div', 'label', s[0]));
+      card.appendChild(R.el('div', 'value num', R.fmt(now, s[4])));
+      var foot = R.el('div', 'foot');
+      foot.appendChild(R.el('span', '', s[5] + ' 대비 '));
+      foot.appendChild(R.el('span', 'num ' + R.dirClass(g), R.fmtGrowth(g, 'int')));
+      card.appendChild(foot);
+      box.appendChild(card);
+    }
+  }
+
+  function renderNotes() {
+    var box = document.getElementById('notes');
+    box.innerHTML = '';
+    for (var i = 0; i < D.notes.length; i++) {
+      box.appendChild(R.el('p', '', '※ ' + D.notes[i].replace(/\*\*/g, '')));
+    }
+  }
+
+  function draw() {
+    scroller.innerHTML = '';
+    var table = R.renderWide(D, opt, function (i) {
+      opt.open[i] = !opt.open[i];
+      draw();
+    });
+    scroller.appendChild(table);
+
+    var cols = table.rows[0] ? table.querySelectorAll('thead tr.h4 th').length - 1 : 0;
+    var shown = table.querySelectorAll('tbody tr').length;
+    document.getElementById('meta-size').textContent =
+      D.rows.length + '행 · ' + cols + '열';
+    document.getElementById('panel-title').textContent =
+      '품목 × 기간 × 채널 (' + shown + '행 표시)';
+    document.getElementById('hint').textContent =
+      '삼각형을 누르면 하위 품목이 열립니다';
+
+    document.getElementById('t-ch').setAttribute('aria-pressed', opt.ch ? 'true' : 'false');
+    document.getElementById('t-nat').setAttribute('aria-pressed', opt.nat ? 'true' : 'false');
+  }
+
+  document.getElementById('t-ch').onclick = function () {
+    opt.ch = !opt.ch; R.writeState('ch', opt.ch ? '1' : '0'); draw();
+  };
+  document.getElementById('t-nat').onclick = function () {
+    opt.nat = !opt.nat; R.writeState('nat', opt.nat ? '1' : '0'); draw();
+  };
+  document.getElementById('t-open').onclick  = function () { openAll(); draw(); };
+  document.getElementById('t-close').onclick = function () { openTo(2); draw(); };
+
+  document.getElementById('csv').onclick = function () {
+    R.download('품목별판매현황_' + D.base + '.csv', R.wideCsv(D, opt));
+  };
+
+  renderKpis();
+  renderNotes();
+  draw();
+})();
+</script>
+
+</body>
+</html>
