@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>플래그십 리포트 — 데모</title>
+<link rel="stylesheet" href="../shared/tokens.css">
+<link rel="stylesheet" href="../shared/report.css">
+<script src="../data/flagship.js"></script>
+<script src="../shared/report.js"></script>
+</head>
+<body>
+
+<div class="notice">
+  데모 화면의 숫자·판매처·상품은 <b>전부 생성된 가상 데이터</b>입니다.
+  실물은 구글 계정 로그인 뒤 시트에서 값을 받아 그립니다 —
+  <a href="https://github.com/B-works-hub/sales-reports-demo#readme">구조 설명</a>
+</div>
+
+<div class="wrap">
+  <div class="crumb"><a href="../">← 매출 리포트</a></div>
+
+  <div class="head">
+    <div>
+      <h1>플래그십 리포트</h1>
+      <p class="sub">매장 방문객 · 요일 / 시간대 / 국적 · 직전 13개월</p>
+    </div>
+    <div class="meta">
+      <b id="meta-base"></b>
+      <span id="meta-window"></span>
+    </div>
+  </div>
+
+  <div class="axes">
+    <div>
+      <span class="axis-label">측정</span>
+      <div class="seg" id="seg-measure" role="group" aria-label="측정 선택"></div>
+    </div>
+    <div>
+      <span class="axis-label">대상</span>
+      <div class="seg" id="seg-aud" role="group" aria-label="대상 선택"></div>
+    </div>
+    <span class="book-note" id="axis-note"></span>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="tabs" id="tabs" role="tablist"></div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2 id="panel-title"></h2>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="hint">행 이름에 커서를 올리면 설명이 나옵니다</span>
+        <button class="btn" id="csv" type="button">CSV 다운로드</button>
+      </div>
+    </div>
+    <div class="scroller" id="scroller"></div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var D = FLAGSHIP_DATA;
+  var R = Report;
+
+  document.getElementById('meta-base').textContent = '기준월 ' + D.base;
+  document.getElementById('meta-window').textContent =
+    D.months[0].key + ' ~ ' + D.months[D.months.length - 1].key;
+
+  /* 섹션마다 쓰이는 축이 다릅니다.
+       measures : 이 섹션이 받는 측정. null 이면 전부 무시(총괄).
+       aud      : 대상 토글을 쓰는가. 국적별은 그 자체가 대상 구분입니다. */
+  var SECTIONS = [
+    { key: 'summary', label: '총괄',       measures: null,  aud: false,
+      why: '총괄은 모든 지표를 한 장에 놓습니다 — 측정·대상 토글을 쓰지 않습니다.' },
+    { key: 'weekday', label: '요일별',     measures: '*',   aud: true },
+    { key: 'hour',    label: '시간대별',   measures: '*',   aud: true },
+    { key: 'nation',  label: '국적별',     measures: ['amount', 'orders'], aud: false,
+      why: '국적은 외국인 안의 구분이라 대상 토글과 무관합니다.' },
+    { key: 'product', label: '상품 TOP 10', measures: ['amount', 'orders'], aud: true,
+      why: '상품은 매출액과 판매수량만 냅니다 — 방문객·전환율은 상품 단위로 정의되지 않습니다.' }
+  ];
+
+  var scroller = document.getElementById('scroller');
+  var title = document.getElementById('panel-title');
+  var kpiBox = document.getElementById('kpis');
+  var tabs = document.getElementById('tabs');
+  var axisNote = document.getElementById('axis-note');
+  var cur = { measure: null, aud: null, section: null };
+
+  function sectionSpec() {
+    for (var i = 0; i < SECTIONS.length; i++) {
+      if (SECTIONS[i].key === cur.section) return SECTIONS[i];
+    }
+    return SECTIONS[0];
+  }
+
+  function measureSpec(key) {
+    for (var i = 0; i < D.measures.length; i++) {
+      if (D.measures[i].key === key) return D.measures[i];
+    }
+    return D.measures[0];
+  }
+
+  function allows(spec, measureKey) {
+    if (spec.measures === null) return false;
+    if (spec.measures === '*') return true;
+    for (var i = 0; i < spec.measures.length; i++) {
+      if (spec.measures[i] === measureKey) return true;
+    }
+    return false;
+  }
+
+  function currentRows() {
+    var spec = sectionSpec();
+    if (spec.key === 'summary') return D.summary;
+    if (spec.key === 'nation') return D.nation[cur.measure];
+    var v = D.views[cur.measure + '|' + cur.aud];
+    return v[spec.key];
+  }
+
+  /* KPI — 당월 방문객·구매건수·전환율·객단가. 섹션과 무관하게 매장의
+     그 달 상태를 먼저 보여줍니다. */
+  function renderKpis() {
+    kpiBox.innerHTML = '';
+    var want = ['방문객 · 전체', '구매건수 · 전체', '구매전환율 · 전체', '객단가 · 전체'];
+    for (var w = 0; w < want.length; w++) {
+      for (var i = 0; i < D.summary.length; i++) {
+        var row = D.summary[i];
+        if (row.name !== want[w]) continue;
+        var card = R.el('div', 'kpi');
+        card.appendChild(R.el('div', 'label', row.name.split(' · ')[0]));
+        card.appendChild(R.el('div', 'value num',
+                              R.fmt(row.values[row.values.length - 1], row.kind)));
+        var foot = R.el('div', 'foot');
+        foot.appendChild(R.el('span', '', '전월대비 '));
+        foot.appendChild(R.el('span', 'num ' + R.dirClass(row.mom_growth),
+                              R.fmtGrowth(row.mom_growth, row.kind)));
+        card.appendChild(foot);
+        kpiBox.appendChild(card);
+      }
+    }
+  }
+
+  function renderNotes() {
+    var box = document.getElementById('notes');
+    box.innerHTML = '';
+    for (var i = 0; i < D.notes.length; i++) {
+      box.appendChild(R.el('p', '', '※ ' + D.notes[i]));
+    }
+  }
+
+  function syncToggles() {
+    var spec = sectionSpec();
+    var i, btns;
+
+    btns = document.getElementById('seg-measure').querySelectorAll('button');
+    for (i = 0; i < btns.length; i++) {
+      var ok = allows(spec, btns[i].dataset.key);
+      btns[i].disabled = !ok;
+      btns[i].setAttribute('aria-pressed',
+        ok && btns[i].dataset.key === cur.measure ? 'true' : 'false');
+    }
+    btns = document.getElementById('seg-aud').querySelectorAll('button');
+    for (i = 0; i < btns.length; i++) {
+      btns[i].disabled = !spec.aud;
+      btns[i].setAttribute('aria-pressed',
+        spec.aud && btns[i].dataset.key === cur.aud ? 'true' : 'false');
+    }
+    axisNote.textContent = spec.why || '';
+  }
+
+  function draw() {
+    var spec = sectionSpec();
+
+    /* 섹션이 받지 않는 측정이 선택돼 있으면 그 섹션이 받는 첫 번째로
+       옮깁니다. 그대로 두면 빈 표가 나오고, 사용자는 데이터가 없는
+       줄로 읽습니다. */
+    if (spec.measures && spec.measures !== '*' && !allows(spec, cur.measure)) {
+      cur.measure = spec.measures[0];
+      R.writeState('m', cur.measure);
+    }
+
+    var bits = [spec.label];
+    if (spec.measures !== null) bits.push(measureSpec(cur.measure).label);
+    if (spec.aud) {
+      for (var i = 0; i < D.audiences.length; i++) {
+        if (D.audiences[i].key === cur.aud) bits.push(D.audiences[i].label);
+      }
+    }
+    title.textContent = bits.join(' · ');
+
+    scroller.innerHTML = '';
+    scroller.appendChild(R.renderMatrix({ rows: currentRows() }, D.months));
+
+    var btns = tabs.querySelectorAll('button');
+    for (i = 0; i < btns.length; i++) {
+      btns[i].setAttribute('aria-selected',
+        btns[i].dataset.key === spec.key ? 'true' : 'false');
+    }
+    syncToggles();
+    renderKpis();
+    renderNotes();
+  }
+
+  function seg(hostId, items, stateKey, apply) {
+    var host = document.getElementById(hostId);
+    for (var i = 0; i < items.length; i++) {
+      (function (it) {
+        var b = R.el('button', '', it.label);
+        b.type = 'button';
+        b.dataset.key = it.key;
+        b.onclick = function () {
+          apply(it.key);
+          R.writeState(stateKey, it.key);
+          draw();
+        };
+        host.appendChild(b);
+      })(items[i]);
+    }
+  }
+
+  seg('seg-measure', D.measures, 'm', function (k) { cur.measure = k; });
+  seg('seg-aud', D.audiences, 'a', function (k) { cur.aud = k; });
+
+  for (var t = 0; t < SECTIONS.length; t++) {
+    (function (s) {
+      var b = R.el('button', '', s.label);
+      b.type = 'button';
+      b.dataset.key = s.key;
+      b.setAttribute('role', 'tab');
+      b.onclick = function () {
+        cur.section = s.key;
+        R.writeState('sec', s.key);
+        draw();
+      };
+      tabs.appendChild(b);
+    })(SECTIONS[t]);
+  }
+
+  document.getElementById('csv').onclick = function () {
+    R.download('플래그십_' + cur.section + '_' + cur.measure + '_' + cur.aud +
+               '_' + D.base + '.csv',
+               R.toCsv({ rows: currentRows() }, D.months));
+  };
+
+  cur.measure = R.readState('m', D.measures[0].key);
+  cur.aud     = R.readState('a', D.audiences[0].key);
+  cur.section = R.readState('sec', SECTIONS[0].key);
+  if (!D.views[cur.measure + '|' + cur.aud]) {
+    cur.measure = D.measures[0].key;
+    cur.aud = D.audiences[0].key;
+  }
+  draw();
+})();
+</script>
+
+</body>
+</html>

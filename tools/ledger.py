@@ -272,23 +272,73 @@ def traffic(rows):
     return out
 
 
+# 시간대별 방문 곡선 — 점심과 늦은 오후에 몰립니다. 합이 1 입니다.
+HOUR_CURVE = [.055, .075, .125, .115, .130, .125, .110, .095, .100, .070]
+
+# 요일 계수 — 주말 매장은 평일보다 붐빕니다(온라인과 반대 방향입니다).
+STORE_WEEKDAY = [0.82, 0.86, 0.90, 0.95, 1.18, 1.42, 1.30]   # 월~일
+
+# 방문객 ÷ 구매건수. 매장은 안 사고 나가는 사람이 훨씬 많습니다.
+# 구매 없는 시간대의 통행량을 정합니다. 슬롯 전환율(conv)과 함께
+# 전체 전환율을 결정합니다 — 2.4 면 23%, 0.6 면 38% 근처입니다.
+VISITOR_RATIO = 0.60
+
+
 def store_traffic(rows):
-    """플래그십 방문객 — 요일·시간대·내외국인. 구매건수보다 커야 전환율이 산출됩니다."""
-    rng = random.Random(SEED + 2)
-    buyers = {}
+    """플래그십 방문객 — 날짜 × 시간대 × 내/외국인.
+
+    구매가 있었던 슬롯에만 방문객을 만들면 시간대별 표가 듬성듬성해지고,
+    '그 시간에 아무도 안 왔다' 와 '왔지만 안 샀다' 가 같은 칸이 됩니다.
+    영업일 × 시간대 × 내/외국인 전 슬롯을 만들고, 구매건수는 원장에서
+    그대로 가져옵니다 — 두 값이 어긋나면 전환율이 거짓이 됩니다.
+
+    방문객은 '기본 통행량' 과 '구매건수 ÷ 목표전환율' 중 큰 쪽입니다.
+    구매건수보다 작은 방문객은 전환율 100%% 초과를 만듭니다.
+
+    시드는 슬롯마다 독립입니다. 전역 시퀀스 하나를 쓰면 원장이 조금만
+    달라져도 모든 슬롯의 전환율이 뒤틀립니다.
+    """
+    orders = {}
+    open_from = None
     for r in rows:
         if r.channel != '플래그십':
             continue
-        key = (r.ym(), r.date, r.hour, r.nation != '내국인')
-        buyers.setdefault(key, set()).add(r.order)
+        if open_from is None or r.date < open_from:
+            open_from = r.date
+        key = (r.date, r.hour, r.nation != '내국인')
+        orders.setdefault(key, set()).add(r.order)
+        # 국적은 주문 단위로 하나입니다
+    if open_from is None:
+        return {}
+
+    # 매장 규모 — 원장의 플래그십 주문 수에 맞춰 기본 통행량을 정합니다.
+    n_orders = len(set(o for s in orders.values() for o in s))
+    n_days = len(set(d for (d, _, _) in orders))
+    per_day = (n_orders / float(n_days)) if n_days else 10.0
+
     out = {}
-    for key, orders in buyers.items():
-        ym, d, hour, foreign = key
-        conv = rng.uniform(0.22, 0.52)          # 구매전환율
-        visitors = max(len(orders), int(round(len(orders) / conv)))
-        out.setdefault(ym, []).append(
-            dict(date=d, hour=hour, foreign=foreign,
-                 visitors=visitors, orders=len(orders)))
+    last = max(d for (d, _, _) in orders)
+    day = open_from
+    while day <= last:
+        wk = STORE_WEEKDAY[day.weekday()]
+        for hi, hour in enumerate(M.HOURS):
+            for foreign in (True, False):
+                rng = random.Random('%d|%s|%d|%d' % (SEED, day.isoformat(), hi, foreign))
+                bought = len(orders.get((day, hour, foreign), ()))
+                # 외국인 방문 비중은 해마다 오릅니다(원장의 국적 배정과 같은 방향).
+                fshare = 0.27 + 0.08 * (day.year - 2024)
+                share = fshare if foreign else (1 - fshare)
+                base = per_day * VISITOR_RATIO * wk * HOUR_CURVE[hi] * share
+                base = max(0, int(round(rng.gauss(base, base * 0.35))))
+                conv = rng.uniform(0.28, 0.56)   # 슬롯 전환율 — 평균 42%
+                need = int(round(bought / conv)) if bought else 0
+                visitors = max(base, need, bought)
+                if not visitors:
+                    continue
+                out.setdefault((day.year, day.month), []).append(dict(
+                    date=day, hour=hour, foreign=foreign,
+                    visitors=visitors, orders=bought))
+        day += dt.timedelta(days=1)
     return out
 
 
