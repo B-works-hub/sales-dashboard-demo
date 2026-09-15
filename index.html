@@ -47,6 +47,10 @@
   .card h3 { margin: 0 0 6px; font-size: 16px; display: flex;
              align-items: center; gap: 8px; flex-wrap: wrap; }
   .card p  { margin: 0; font-size: 13px; color: var(--ink-2); }
+  /* 같은 화면 안의 탭이라는 걸 적어 둡니다 — 따로 있는 리포트로 보이면
+     그것대로 오해입니다. */
+  .card-where { margin-top: 8px !important; font-size: 12px !important;
+                color: var(--ink-muted) !important; }
 
   .tag { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px;
          background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
@@ -105,6 +109,18 @@
     <a class="card" href="flagship/">
       <h3>플래그십 <span class="tag">monthly</span></h3>
       <p>매장 방문객 요일·시간대별 · 내/외국인 국적별 · 상품 TOP 10</p>
+    </a>
+  </div>
+
+  <h2>기획전이 끝나면</h2>
+  <div class="grid">
+    <a class="card" href="daily/?promo=promo%3A%EB%A3%B8%EC%8A%A4%ED%94%84%EB%A0%88%EC%9D%B4%20%EC%8B%A0%EA%B7%9C%20%EB%9F%B0%EC%B9%AD&amp;tab=review">
+      <h3>프로모션 리뷰 <span class="tag">per campaign</span></h3>
+      <p>
+        기획전 하나를 골라 카드 일곱 장 — 발신 성과 · 구매 고객 구성 ·
+        직전 7일/30일/작년 대비 · 유입 · 객단가 · 구매 조합
+      </p>
+      <p class="card-where">일일 매출 안의 탭입니다 — 바로 열립니다</p>
     </a>
   </div>
 

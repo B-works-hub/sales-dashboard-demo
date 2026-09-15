@@ -127,6 +127,12 @@
                text-align: center; }
   .demo-note strong { font-weight: 700; }
   .demo-note a { color: inherit; }
+  /* 허브로 돌아가는 줄 — 프로모션 리뷰 링크로 바로 들어온 사람은
+     뒤로가기 말고는 나머지 리포트를 찾을 길이 없습니다. */
+  .demo-home { max-width: 1560px; margin: 0 auto;
+               padding: 14px 20px 0; font-size: 12.5px; }
+  .demo-home a { color: var(--accent); text-decoration: none; }
+  .demo-home a:hover { text-decoration: underline; }
 
   .wrap { max-width: 1560px; margin: 0 auto; padding: 24px 20px 72px; }
 
@@ -615,6 +621,8 @@
   실물은 구글 계정 로그인 뒤 시트에서 값을 받아 그립니다 —
   <a href="https://github.com/B-works-hub/sales-dashboard-demo#readme">구조 설명</a>
 </div>
+
+<div class="demo-home"><a href="../">← 매출 리포트</a></div>
 
 <!-- ── 대시보드 ───────────────────────────────────────────── -->
 <div class="app">
