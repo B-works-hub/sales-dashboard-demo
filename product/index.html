@@ -4,7 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>상품별 리포트 — 데모</title>
-<script src="https://cdn.amplitude.com/script/8dab0aad4ec8f11bcbf079ea4565fcca.js"></script>
+<!-- 분석 전용 SDK. 프로젝트 키 로더(cdn.amplitude.com/script/<키>.js)는 원격 설정을 보고
+     세션 리플레이를 스스로 붙이므로 쓰지 않습니다 — 공개 데모 방문자를 녹화하지 않기 위해. -->
+<script src="https://cdn.amplitude.com/libs/analytics-browser-2.42.4-min.js.gz"
+        integrity="sha384-lKBFu+lrE+l3rHaNqttqd3e3ga1kwCKyeO1JiVVq2NlrrkHTdt8SobN3bqqLSKSw"
+        crossorigin="anonymous"></script>
 <script>
   window.amplitude.init('8dab0aad4ec8f11bcbf079ea4565fcca', {
     serverZone: 'US',
