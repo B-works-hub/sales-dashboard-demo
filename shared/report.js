@@ -280,6 +280,7 @@ var Report = (function () {
     document.body.appendChild(a); a.click();
     document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+    if (window.amplitude) window.amplitude.track('CSV Downloaded');
   }
 
   /* ── URL 상태 ─────────────────────────────────────────────────── */
