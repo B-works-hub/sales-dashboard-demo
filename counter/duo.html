@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>내점객 카운터 — 직원 2명 동시 사용</title>
+<script src="https://cdn.amplitude.com/libs/analytics-browser-2.42.4-min.js.gz"
+        integrity="sha384-lKBFu+lrE+l3rHaNqttqd3e3ga1kwCKyeO1JiVVq2NlrrkHTdt8SobN3bqqLSKSw"
+        crossorigin="anonymous"></script>
+<script>
+  if (window.amplitude) window.amplitude.init('8dab0aad4ec8f11bcbf079ea4565fcca', { serverZone: 'US', autocapture: true });
+</script>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e9edf0; color: #1d2227;
+         font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "맑은 고딕", system-ui, sans-serif; }
+  .bar { background: #fdeeea; color: #a4481b; border-bottom: 1px solid #f3c6ba; font-size: 12.5px; padding: 8px 16px; text-align: center; line-height: 1.55; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 22px 16px 40px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  .lede { margin: 0; color: #4c545c; font-size: 14px; line-height: 1.6; max-width: 70ch; }
+  ol { margin: 12px 0 0; padding-left: 20px; color: #4c545c; font-size: 13.5px; line-height: 1.8; }
+  .phones { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 18px; margin-top: 20px; }
+  .phone { background: #1d2227; border-radius: 34px; padding: 10px; box-shadow: 0 20px 50px -24px rgba(0,0,0,.5); }
+  .phone p { color: #c9d0d5; font-size: 12.5px; margin: 4px 10px 8px; display: flex; justify-content: space-between; }
+  iframe { display: block; width: 100%; height: 760px; border: 0; border-radius: 26px; background: #f4f6f8; }
+  .nav { margin-top: 18px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .nav a { color: #4c545c; background: #fff; border: 1px solid #dfe3e6; border-radius: 999px; padding: 7px 12px; font-size: 13px; text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="bar">데모입니다. 두 화면은 이 브라우저의 같은 저장소를 씁니다. 매장 · 직원 · 숫자는 예시 값입니다.</div>
+<main class="wrap">
+  <h1>직원 2명이 동시에 쓸 때</h1>
+  <p class="lede">매장에서는 직원마다 자기 휴대폰으로 셉니다. 저장 전 합계는 휴대폰마다 따로이고, [확인]을 누른 줄만 같은 시트에 쌓입니다.
+    누적값은 30초마다, 그리고 저장 직후에 다시 읽습니다.</p>
+  <ol>
+    <li>왼쪽에서 내국인을 두 번 누르고 [확인]: 오른쪽 누적값이 바로 바뀝니다 (같은 저장소를 다시 읽음)</li>
+    <li>양쪽에서 「오늘 기록 관리」를 열고 같은 줄의 [수정]을 누릅니다</li>
+    <li>왼쪽에서 먼저 [수정 저장] 한 뒤 오른쪽에서 저장하면, 덮어쓰지 않고 멈춥니다</li>
+  </ol>
+  <div class="phones">
+    <div class="phone"><p><span>휴대폰 1</span><span>매장 A · 직원 A</span></p>
+      <iframe title="휴대폰 1, 매장 A 직원 A" src="index.html?embed=1&amp;device=duo-a&amp;store=%EB%A7%A4%EC%9E%A5%20A&amp;staff=%EC%A7%81%EC%9B%90%20A"></iframe></div>
+    <div class="phone"><p><span>휴대폰 2</span><span>매장 A · 직원 B</span></p>
+      <iframe title="휴대폰 2, 매장 A 직원 B" src="index.html?embed=1&amp;device=duo-b&amp;store=%EB%A7%A4%EC%9E%A5%20A&amp;staff=%EC%A7%81%EC%9B%90%20B"></iframe></div>
+  </div>
+  <div class="nav"><a href="./">한 화면으로 보기</a><a href="../flagship/">플래그십 리포트</a><a href="../">리포트 허브</a></div>
+</main>
+</body>
+</html>
